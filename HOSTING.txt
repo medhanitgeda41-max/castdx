@@ -3,3 +3,6 @@ CASTD on the web: see the step-by-step guide in the chat. Short version (Render)
 3. Build command: pip install -r requirements.txt   Start command: python trend_app.py
 4. Choose the Free plan > Create. Open the link Render gives you.
 Hugging Face Spaces: New Space > Docker > upload these files (the Dockerfile is included).
+5. Optional Meteomatics extra data: on Render open your service > Environment > Add Environment Variable.
+   Name METEOMATICS_USER, value = your user name.  Name METEOMATICS_PASS, value = your password. Save.
+   Never type these into a file in GitHub. Without them the extra rows simply do not show.

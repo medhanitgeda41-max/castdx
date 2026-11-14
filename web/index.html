@@ -266,7 +266,7 @@ function detail(pi,vid,scroll){
   if(!t){el.innerHTML=`<h2>${esc(v.name)} · ${esc(p.name)}</h2><p class="muted">No data.</p>`;return}
   const col=!t.significant?"flat":t.direction==="rising"?"up":"down";
   const rows=(a)=>a.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("");
-  el.innerHTML=`<div class="row" style="align-items:center;justify-content:space-between"><div><h2 style="margin:0">${esc(v.name)} · ${esc(p.name)}</h2><div class="muted">${esc(v.source)}</div></div>
+  el.innerHTML=`<div class="row" style="align-items:center;justify-content:space-between"><div><h2 style="margin:0">${esc(v.name)} · ${esc(p.name)}</h2><div class="muted">${esc(v.source)}</div>${p.vars[vid]&&p.vars[vid].note?`<div class="muted" style="color:var(--bad,#b3261e);font-weight:600">${esc(p.vars[vid].note)}</div>`:""}</div>
    <div><span class="badge ${t.significant?"yes":"no"} big">${t.verdict}</span> <span class="badge ${col} big">${t.direction}</span></div></div>
    <p style="font-size:17px;margin:10px 0">${esc(t.sentence)}</p>${t.warnings.map(w=>`<div class="note">${esc(w)}</div>`).join("")}
    ${chart(d,v)}
