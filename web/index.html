@@ -334,6 +334,12 @@ function overlay(a,b,na,nb,ca,cb,ta,tb){
   const tleg=ta||tb?`<span><i class="sw" style="border-color:var(--up);border-top-width:4px"></i>Straight line: trend (red rising, blue falling, grey none)</span>`:"";
   return g+(a?line(a,A,ca):"")+line(b,Bz,cb)+tl+`</svg><div class="legend">${a?`<span><i class="sw" style="border-color:${ca}"></i>${esc(na)}</span>`:""}<span><i class="sw" style="border-color:${cb}"></i>${esc(nb)}</span>${a?"<span>Same scale.</span>":""}${tleg}</div>`;
 }
+function causalHtml(d,R){const c=d.causal;if(!c)return `<div class="muted" style="font-size:14px;margin:8px 0">Cause-and-effect check: ${R.causal&&R.causal.reason?esc(R.causal.reason):"not available."}</div>`;
+ const u=R.causal.unit||"steps",pm=c.pcmci,cc=c.ccm,pp=v=>v<0.001?"p < 0.001":"p = "+(v<0.1?v.toFixed(3):v.toFixed(2)),lagw=pm.lag+" "+(pm.lag===1?u.replace(/s$/,""):u);
+ const cls=c.level>=3?"yes":c.level>=2?"warn":"no";
+ return `<div class="chk" style="margin-top:10px"><span><b>Cause-and-effect check</b> <span class="badge ${cls}">${esc(c.label)}</span></span></div>
+  <div class="chk"><b class="${pm.supports?"y":"n"}">${pm.supports?"✓":"–"}</b><span><b>Leads the target (PCMCI-style).</b> ${esc(d.name)} ${lagw} earlier, with other links held fixed: partial r = ${sgn(pm.r)}, ${pp(pm.p_adj)}. The other way round (target leads driver): ${pp(pm.rev_p_adj)}.</span></div>
+  <div class="chk"><b class="${cc.supports?"y":"n"}">${cc.supports?"✓":"–"}</b><span><b>Leaves a mark in the target (CCM).</b> The target's history estimates the driver with skill ${cc.rho.toFixed(2)} (${cc.rho_small.toFixed(2)} with little data), ${pp(cc.p)} against random copies${cc.converges?", and skill grows with more data":", but skill does not grow with more data"}.</span></div>`}
 function badgeFor(d){const l=d.label;return `<span class="badge ${d.score>=3&&d.kind==="normal"?"yes":d.score>=2||l.startsWith("Fits")||l.startsWith("Explains")?"warn":"no"}">${esc(l)}</span>`}
 function dirTxt(t,u){return t&&t.significant?(t.direction==="rising"?"▲ rising":"▼ falling")+" "+sgn(t.slope_decade,3)+" "+esc(u)+" per decade":"— no clear trend"}
 function causeShow(el,R){
@@ -346,7 +352,7 @@ function causeShow(el,R){
     h+=overlay({x:B.series.x,values:B.series.actual},{x:B.series.x,values:B.series.modelled},"Actual "+T.name.toLowerCase(),"Rebuilt from these drivers","var(--mute)","var(--brand)");
   }
   if(B.fits_direction&&B.fits_direction.length)h+=`<p class="muted">Fits, but cannot be tested: ${B.fits_direction.map(x=>esc(x.name)).join(", ")}.</p>`;
-  h+=`<h3>Candidates</h3>`;
+  h+=`<h3>Candidates</h3><p class="muted" style="font-size:14px;margin:4px 0 8px">Each candidate also gets a cause-and-effect check. Trends and seasons are removed first, so two things that only rise together do not count as cause and effect. It looks at which one leads the other.</p>`;
   R.drivers.forEach((d,i)=>{
     if(d.error){h+=`<div class="cause"><div style="padding:12px 14px"><b>${esc(d.name)}</b> <span class="badge no">No data</span><div class="muted" style="font-size:14px">${esc(d.error)}</div></div></div>`;return}
     const dt=d.trend;
@@ -354,6 +360,7 @@ function causeShow(el,R){
      <p style="margin:0 0 8px">${esc(d.mechanism)}</p>
      ${d.may_be_feedback?'<div class="note">Moves at the same time. May be a result too.</div>':""}${d.may_be_effect?'<div class="note">May be a result, not a cause.</div>':""}
      ${d.checks.map(c=>`<div class="chk"><b class="${c.ok?"y":"n"}">${c.ok?"✓":"–"}</b><span><b>${esc(c.name)}.</b> ${esc(c.text)}</span></div>`).join("")}
+     ${causalHtml(d,R)}
      ${d.kind==="untestable"?'<div class="note">Straight-line change: only direction and physics can be judged.</div>':""}
      <div class="muted" style="font-size:14px;margin:6px 0">${esc(d.lead_text)} r = ${sgn(d.r_raw)}.</div>
      ${overlay(null,d.series,T.name,d.name,"var(--mute)","var(--brand)",null,dt)}

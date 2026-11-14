@@ -22,6 +22,7 @@ import statistics
 from concurrent.futures import ThreadPoolExecutor
 
 import stats
+import causal
 import trends
 
 CO2_URL = "https://gml.noaa.gov/webdata/ccgg/trends/co2/co2_mm_mlo.csv"
@@ -480,6 +481,7 @@ def analyse_causes(place: dict, target: str, y0: int, m0: int, y1: int, m1: int,
         r["leads"] = len(r["checks"]) > 3 and r["checks"][3]["ok"]
     ok.sort(key=lambda r: (-r["score"] - (0.5 if r["kind"] == "untestable" and r["score"] else 0), -abs(r["cmp"]["r_det"])))
     best = best_explanation(tser, tr_t, ok, mode)
+    causal_out = _causal_layer(tser, ok, mode)
     out_d = []
     for r in ok + [r for r in recs if not r["cmp"]]:
         c = r["cmp"]
@@ -491,13 +493,29 @@ def analyse_causes(place: dict, target: str, y0: int, m0: int, y1: int, m1: int,
                          "r_diff": c["r_diff"], "p_diff": c["p_diff"], "best_lag": c["best_lag"], "lead_text": lead_text(c, mode), "granger_fwd": c["granger_fwd"], "granger_rev": c["granger_rev"],
                          "may_be_effect": bool(c["granger_rev"] is not None and c["granger_rev"] < 0.05 and (c["granger_fwd"] is None or c["granger_fwd"] >= 0.05)),
                          "trend": {k: tr[k] for k in ("direction", "significant", "slope_decade", "p", "sentence", "verdict")},
+                         "causal": (causal_out.get("by_driver") or {}).get(r["id"]),
                          "series": {"x": r["_ser"]["x"], "values": r["_ser"]["values"], "labels": r["_ser"]["labels"]}})
         out_d.append(item)
     return {"place": place, "target": {"id": target, "name": info["name"], "unit": info["unit"], "trend": {k: tr_t[k] for k in ("direction", "significant", "slope_decade", "p", "sentence", "verdict", "n")},
                                        "series": {"x": tser["x"], "values": tser["values"], "labels": tser["labels"]}},
-            "drivers": out_d, "best": best, "mode": mode,
+            "drivers": out_d, "best": best, "mode": mode, "causal": {k: v for k, v in causal_out.items() if k != "by_driver"},
             "notes": ["This shows which candidates fit the target in the data and in physics. It is evidence of association, not proof of cause.",
                       "Drivers are read at the same place from the same model grid, so they carry the model's own limits."]}
+
+
+def _causal_layer(tser: dict, ok: list, mode: str) -> dict:
+    """PCMCI-style test and CCM on the detrended, deseasonalised series of the target and every usable driver."""
+    if not ok:
+        return {"available": False, "reason": "No usable driver."}
+    try:
+        def prep(ser):
+            seas = ser["seasons"] if mode == "month" else None
+            res = detrend(ser["x"], ser["values"], seas)
+            return [_tindex(x, mode) for x in ser["x"]], res
+        series = [prep(tser)] + [prep(r["_ser"]) for r in ok]
+        return causal.run(series, ["__target__"] + [r["id"] for r in ok], mode)
+    except Exception as e:      # noqa: BLE001 - the causal layer must never break the rest of the analysis
+        return {"available": False, "reason": f"Could not run: {type(e).__name__}"}
 
 
 def best_explanation(tser: dict, tr_t: dict, ranked: list, mode: str) -> dict:
