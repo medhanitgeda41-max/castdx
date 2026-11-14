@@ -1,0 +1,5 @@
+CASTD on the web: see the step-by-step guide in the chat. Short version (Render):
+1. Put this folder on GitHub.  2. Render > New > Web Service > pick the repo.
+3. Build command: pip install -r requirements.txt   Start command: python trend_app.py
+4. Choose the Free plan > Create. Open the link Render gives you.
+Hugging Face Spaces: New Space > Docker > upload these files (the Dockerfile is included).

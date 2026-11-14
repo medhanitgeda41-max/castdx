@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CASTD: Coastal Area and Soil Trend Detection</title>
+<link rel="stylesheet" href="/lib/leaflet.css">
+<style>
+:root{color-scheme:dark;--page:#0f1923;--bg:#0d1620;--card:#17222d;--ink:#eef3f8;--mute:#9db0c1;--line:#27343f;--brand:#4cc3e0;--brand2:#143440;--up:#ff8f85;--up-bg:#3b2020;--down:#8fbcff;--down-bg:#1b2d44;--flat:#9db0c1;--flat-bg:#212d39;--ok:#6fdc9a;--ok-bg:#15332a;--warn:#f2c15f;--warn-bg:#3a2f17;--font:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;background:var(--page);color:var(--ink);font:17px/1.55 var(--font)}
+header{padding:22px 20px 8px;max-width:1120px;margin:0 auto}
+h1{margin:0;font-size:26px}h2{margin:0 0 6px;font-size:18px}h3{margin:14px 0 6px;font-size:15px}
+.sub{color:var(--mute);margin:4px 0 0}
+main{max-width:1120px;margin:0 auto;padding:8px 20px 60px;display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+.two{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px}
+@media (max-width:860px){.two{grid-template-columns:minmax(0,1fr)}}
+#map{height:340px;border-radius:10px;border:1px solid var(--line);background:var(--brand2)}
+#maperr{color:var(--mute);padding:14px}
+label{display:block;font-weight:600;font-size:14px;margin:10px 0 4px}
+input[type=text],input[type=number],select{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink);font:inherit}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}.grow{flex:1;min-width:120px}
+button{font:inherit;font-weight:700;border-radius:10px;border:0;padding:10px 16px;cursor:pointer;background:var(--brand);color:#06222c}
+button.alt{background:var(--brand2);color:var(--brand)}button.small{padding:6px 11px;font-size:14px}button:disabled{opacity:.55;cursor:default}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible,td[role=button]:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 0}
+.chip{display:inline-flex;align-items:center;gap:8px;background:var(--brand2);color:var(--ink);border-radius:99px;padding:5px 6px 5px 12px;font-size:14px}
+.chip button{background:transparent;color:var(--mute);padding:0 6px;font-size:18px;line-height:1}
+.vars{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:2px 14px}
+.vars label{font-weight:500;display:flex;gap:8px;align-items:flex-start;margin:6px 0}
+.vars input{margin-top:5px}
+.muted{color:var(--mute)}.hit{display:grid;gap:6px;margin-top:8px}
+.hit button{text-align:left;background:var(--bg);color:var(--ink);border:1px solid var(--line);font-weight:500}
+table{border-collapse:collapse;width:100%}
+th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:13px;color:var(--mute);font-weight:700}
+td[role=button]{cursor:pointer}td[role=button]:hover{background:var(--brand2)}
+.scroll{overflow-x:auto}
+.badge{display:inline-block;border-radius:8px;padding:2px 9px;font-weight:700;font-size:13px}
+.badge.up{background:var(--up-bg);color:var(--up)}.badge.down{background:var(--down-bg);color:var(--down)}.badge.flat{background:var(--flat-bg);color:var(--flat)}
+.badge.yes{background:var(--ok-bg);color:var(--ok)}.badge.no{background:var(--flat-bg);color:var(--flat)}.badge.warn{background:var(--warn-bg);color:var(--warn)}
+.big{font-size:20px;font-weight:700}
+.stat td:first-child{width:46%;color:var(--mute)}
+.note{background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:8px 12px;margin:8px 0;font-size:14px}
+.err{background:var(--up-bg);color:var(--up);border-radius:10px;padding:10px 14px}
+svg text{font-family:var(--font);fill:var(--mute);font-size:11px}
+details summary{cursor:pointer;font-weight:700}
+.cause{border:1px solid var(--line);border-radius:12px;padding:0;margin:10px 0;background:var(--bg)}
+.cause>summary{padding:12px 14px;list-style:none;display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.cause>summary::-webkit-details-marker{display:none}
+.cause .in{padding:0 14px 14px}
+.chk{display:flex;gap:8px;margin:6px 0;align-items:flex-start}.chk b{flex:none;width:22px;height:22px;border-radius:50%;text-align:center;line-height:22px;font-size:13px}
+.chk b.y{background:var(--ok-bg);color:var(--ok)}.chk b.n{background:var(--flat-bg);color:var(--flat)}
+.ev a{color:var(--brand)}.ev li{margin:4px 0}
+#evmap{height:380px;border-radius:12px;border:1px solid var(--line);margin:10px 0}
+.evi{border:1px solid var(--line);border-radius:12px;margin:8px 0;background:var(--bg)}.evi>summary{padding:10px 14px;list-style:none;display:flex;gap:10px;flex-wrap:wrap;justify-content:space-between;align-items:center;cursor:pointer}
+.evi>summary::-webkit-details-marker{display:none}.evi .in{padding:0 14px 12px}.evi.sel{outline:2px solid var(--brand)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--mute)}
+.sw{display:inline-block;width:22px;height:0;border-top:3px solid;vertical-align:middle;margin-right:5px}
+.lv{display:inline-block;border-radius:8px;padding:3px 10px;font-weight:800;font-size:14px}
+.lv-ok{background:#15332a;color:#6fdc9a}.lv-watch{background:#3a2f17;color:#f2c15f}.lv-warning{background:#402a17;color:#ffb066}.lv-danger{background:#3b2020;color:#ff8f85}.lv-good{background:#15332a;color:#6fdc9a}.lv-mixed{background:#3a2f17;color:#f2c15f}.lv-bad{background:#3b2020;color:#ff8f85}.lv-neutral{background:var(--flat-bg);color:var(--flat)}
+.issue{border:1px solid var(--line);border-radius:12px;padding:14px;margin:10px 0}.issue h3{margin:0 0 4px}.sgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.rec{border:1px solid var(--line);border-left:5px solid var(--brand);border-radius:10px;padding:10px 14px;margin:8px 0}.rec.p0{border-left-color:#b4281e}.rec.p1{border-left-color:#c98a14}.rec.p2{border-left-color:#2e7d32}.rec ul{margin:6px 0 0;padding-left:20px}
+.banner{border-radius:12px;padding:14px 16px;margin:0 0 12px}.banner b{font-size:19px}
+body[data-sec=coast]{--page:#0a1828;--bg:#09131f;--card:#11253a;--line:#1f4263;--brand:#4cc3e0;--brand2:#12405a;border-top:8px solid #4cc3e0}
+body[data-sec=soil]{--page:#14190f;--bg:#10150c;--card:#1d2817;--line:#38502c;--brand:#9bd45f;--brand2:#2a4220;border-top:8px solid #9bd45f}
+body[data-sec=soil] button:not(.alt){color:#10200a}
+body[data-sec] #sub{color:var(--brand);font-weight:600}
+.pick-coast{border-top:6px solid #4cc3e0}.pick-soil{border-top:6px solid #9bd45f}.pick-soil button{background:#9bd45f;color:#10200a}
+@media print{.noprint{display:none!important}body{background:#fff}.card{break-inside:avoid}}
+</style>
+</head>
+<body>
+<header>
+<h1>CASTD</h1>
+<p class="sub" id="sub">Coastal Area and Soil Trend Detection</p>
+<p class="noprint" id="switchwrap" hidden><button class="alt small" id="switch">Switch section</button></p>
+</header>
+<section id="landing" class="noprint" style="max-width:980px;margin:24px auto;padding:0 16px">
+<h2>What would you like to do?</h2>
+<div class="two">
+  <div class="card pick-coast"><h3 style="color:#4cc3e0">Coastal area</h3><p style="font-size:18px;margin:6px 0">Do you want to check a coastal area and assess its risk?</p><p class="muted">See which sea and coast trends are getting worse, why, and what to do about them.</p><button id="go-coast">Check a coastal area</button></div>
+  <div class="card pick-soil"><h3 style="color:#9bd45f">Soil</h3><p style="font-size:18px;margin:6px 0">Do you want to find which areas of soil are slowly drying out?</p><p class="muted">See where soil wetness is falling over the years, how fast, and what is behind it.</p><button id="go-soil">Find drying soil</button></div>
+</div>
+</section>
+<main id="app" hidden>
+<section class="two noprint">
+  <div class="card">
+    <h2>1. Choose places</h2>
+    <p class="muted" style="margin:0 0 8px">Click the sea or coast on the map, or search.</p>
+    <div id="map" aria-label="Map. Click to add a place."><div id="maperr" hidden>The map could not load. Use the search box or type coordinates.</div></div>
+    <div class="row" style="margin-top:6px">
+      <div class="grow"><label for="q">Search a place</label><input type="text" id="q" placeholder="Dubai, Mombasa, Miami…"></div>
+      <button class="alt" id="qgo">Search</button>
+    </div>
+    <div id="hits" class="hit"></div>
+    <div class="row">
+      <div class="grow"><label for="lat">Latitude</label><input type="number" id="lat" step="any" min="-90" max="90" placeholder="25.20"></div>
+      <div class="grow"><label for="lon">Longitude</label><input type="number" id="lon" step="any" min="-180" max="180" placeholder="55.27"></div>
+      <button class="alt" id="addxy">Add</button>
+    </div>
+    <div id="chips" class="chips" aria-live="polite"></div>
+  </div>
+  <div class="card">
+    <h2>2. Choose what to test</h2>
+    <div id="vars" class="vars"></div>
+    <div id="monthbox">
+    <h3>Time period</h3>
+    <div class="row">
+      <div class="grow"><label for="m0">From</label><select id="m0"></select></div>
+      <div class="grow"><label for="y0">&nbsp;</label><input type="number" id="y0" aria-label="From year"></div>
+    </div>
+    <div class="row">
+      <div class="grow"><label for="m1">To</label><select id="m1"></select></div>
+      <div class="grow"><label for="y1">&nbsp;</label><input type="number" id="y1" aria-label="To year"></div>
+    </div>
+    <details style="margin-top:10px"><summary>Only some months?</summary>
+      <div class="row" style="margin:8px 0 2px"><button class="alt small" type="button" data-season="1,2,3,4,5,6,7,8,9,10,11,12">All</button><button class="alt small" type="button" data-season="12,1,2">Dec–Feb</button><button class="alt small" type="button" data-season="3,4,5">Mar–May</button><button class="alt small" type="button" data-season="6,7,8">Jun–Aug</button><button class="alt small" type="button" data-season="9,10,11">Sep–Nov</button></div>
+      <div id="mchecks" class="vars" style="grid-template-columns:repeat(auto-fill,minmax(80px,1fr))"></div>
+    </details>
+    </div>
+    <div id="daybox" hidden><input type="date" id="d0"><input type="date" id="d1"></div>
+    <h3>Look at</h3>
+    <label style="font-weight:500;display:flex;gap:8px;margin:4px 0"><input type="radio" name="mode" value="year" checked> One value per year</label>
+    <label style="font-weight:500;display:flex;gap:8px;margin:4px 0"><input type="radio" name="mode" value="month"> Every month</label>
+    <p class="muted" style="margin:8px 0 0;font-size:14px">Minimum: 4 years, or 12 months. Pick a point in the sea or on the coast.</p>
+    <div class="row" style="margin-top:14px"><button id="run" class="grow">3. Run the analysis</button></div>
+    <p id="status" class="muted" role="status"></p>
+  </div>
+</section>
+
+<section id="out" hidden>
+  <div class="card">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <div><h2 style="margin:0">Which changes are significant?</h2><p class="muted" id="sumtext" style="margin:2px 0 0"></p></div>
+      <div class="row noprint"><button class="alt small" id="dl1">Download results (CSV)</button><button class="alt small" id="dl2">Download yearly data (CSV)</button><button class="alt small" id="pr">Print</button></div>
+    </div>
+    <div class="scroll"><table id="matrix"></table></div>
+    <p class="muted" style="font-size:14px;margin:8px 0 0">Significant = 95% confidence. Click a row for details. <span id="regnote">Regional data (about 25 to 50 km), not one beach.</span></p>
+  </div>
+  <div class="card" id="safecard" style="margin-top:16px" hidden></div>
+  <div class="card" id="detail" style="margin-top:16px" hidden></div>
+  <div class="card noprint" id="calcard" style="margin-top:16px" hidden></div>
+  <div class="card" id="rankcard" style="margin-top:16px" hidden></div>
+</section>
+
+</main>
+<script src="/lib/leaflet.js"></script>
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let DOMAIN="coast",CFG=null,places=[],selected=new Set(),RES=null,LASTBODY=null,map=null,markers=[];
+function fmt(v,nd=2){if(v==null||!isFinite(v))return "–";const a=Math.abs(v);return (a!==0&&a<Math.pow(10,-nd))?v.toFixed(nd+2):v.toFixed(nd)}
+function pf(p){return p<0.001?"< 0.001":p.toFixed(3)}
+function sgn(v,nd=2){return (v>0?"+":"")+fmt(v,nd)}
+
+async function api(path,body){const r=await fetch(path,{method:body?"POST":"GET",headers:{"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});const j=await r.json().catch(()=>({error:"Bad answer from the app."}));if(!r.ok)throw new Error(j.error||"Something went wrong.");return j}
+
+function renderChips(){
+  $("chips").innerHTML=places.map((p,i)=>`<span class="chip">${esc(p.name)}<button data-rm="${i}" aria-label="Remove ${esc(p.name)}">×</button></span>`).join("")||'<span class="muted">No places yet.</span>';
+  if(map){markers.forEach(m=>m.remove());markers=places.map(p=>L.marker([p.lat,p.lon]).addTo(map))}
+
+}
+function addPlace(lat,lon,name){
+  if(places.length>=10){$("status").textContent="Up to 10 places at a time.";return}
+  lat=Math.round(lat*1e4)/1e4;lon=Math.round(lon*1e4)/1e4;
+  if(!isFinite(lat)||!isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180){$("status").textContent="Those coordinates are not on Earth.";return}
+  places.push({name:name||`${lat.toFixed(2)}, ${lon.toFixed(2)}`,lat,lon});renderChips();$("status").textContent="";
+}
+$("chips").onclick=e=>{const b=e.target.closest("[data-rm]");if(b){places.splice(+b.dataset.rm,1);renderChips()}};
+$("addxy").onclick=()=>addPlace(parseFloat($("lat").value),parseFloat($("lon").value));
+async function search(){
+  const q=$("q").value.trim();if(!q)return;$("hits").innerHTML='<span class="muted">Searching…</span>';
+  try{const r=await fetch("https://geocoding-api.open-meteo.com/v1/search?count=5&language=en&name="+encodeURIComponent(q));const j=await r.json();
+    const list=j.results||[];$("hits").innerHTML=list.length?list.map((h,i)=>`<button data-h="${i}">${esc(h.name)}${h.admin1?", "+esc(h.admin1):""}, ${esc(h.country||"")}</button>`).join(""):'<span class="muted">Nothing found. Try another spelling.</span>';
+    $("hits").onclick=e=>{const b=e.target.closest("[data-h]");if(!b)return;const h=list[+b.dataset.h];addPlace(h.latitude,h.longitude,h.name+(h.country_code?" ("+h.country_code+")":""));if(map)map.setView([h.latitude,h.longitude],6);$("hits").innerHTML=""}}
+  catch(e){$("hits").innerHTML='<span class="muted">Search needs the internet. You can type coordinates instead.</span>'}
+}
+$("qgo").onclick=search;$("q").onkeydown=e=>{if(e.key==="Enter")search()};
+
+function renderVars(){
+  const groups={};CFG.variables.filter(v=>v.domain===DOMAIN).forEach(v=>(groups[v.group]=groups[v.group]||[]).push(v));
+  $("vars").innerHTML=Object.keys(groups).map(g=>`<div><h3>${esc(g)}</h3>${/Extra/.test(g)?'<p class="muted" style="font-size:13px;margin:0 0 4px">Sea level, satellite sea temperature, waves. Optional.</p>':""}${groups[g].map(v=>`<label><input type="checkbox" value="${v.id}" ${selected.has(v.id)?"checked":""}><span>${esc(v.name)} ${v.unit?`<span class="muted">(${esc(v.unit)})</span>`:""}</span></label>`).join("")}</div>`).join("");
+  $("vars").onchange=e=>{if(e.target.checked)selected.add(e.target.value);else selected.delete(e.target.value)};
+}
+
+function modeNow(){return document.querySelector("input[name=mode]:checked").value}
+function body(){if(modeNow()==="day")return {domain:DOMAIN,places,vars:[...selected],mode:"day",d0:$("d0").value,d1:$("d1").value};return {domain:DOMAIN,places,vars:[...selected],y0:+$("y0").value,m0:+$("m0").value,y1:+$("y1").value,m1:+$("m1").value,months:[...document.querySelectorAll("#mchecks input:checked")].map(x=>+x.value),mode:document.querySelector("input[name=mode]:checked").value}}
+$("run").onclick=async()=>{
+  if(!places.length){$("status").textContent="Add at least one place.";return}
+  
+  if(modeNow()==="day"&&(!$("d0").value||!$("d1").value)){$("status").textContent="Choose a start and an end date.";return}
+  if(!selected.size){$("status").textContent="Choose at least one variable.";return}
+  if(modeNow()!=="day"&&!document.querySelector("#mchecks input:checked")){$("status").textContent="Choose at least one month of the year.";return}
+  $("run").disabled=true;$("status").textContent=(DOMAIN==="soil"?"Loading soil data…":"Loading sea data…");$("out").hidden=true;
+  try{LASTBODY=body();RES=await api("/api/run",LASTBODY);for(const k in CAUSES)delete CAUSES[k];for(const k in CAL)delete CAL[k];$("status").textContent="";show()}
+  catch(e){$("status").innerHTML='<div class="err">'+esc(e.message)+"</div>"}
+  $("run").disabled=false;
+};
+
+function cellHtml(t,err){
+  if(!t)return '<span class="muted">No data</span>'+(err?`<div class="muted" style="font-size:12px">${esc(err)}</div>`:"");
+  const arrow=t.direction==="rising"?"▲":t.direction==="falling"?"▼":"■";
+  const cls=!t.significant?"flat":t.direction==="rising"?"up":"down";
+  return `<span class="badge ${t.significant?"yes":"no"}">${t.significant?"Significant":"Not significant"}</span><div><span class="badge ${cls}">${arrow} ${t.direction==="flat"?"flat":t.direction}</span></div><div class="muted" style="font-size:13px">${sgn(t.slope_decade)} per ${t.rate_label}, p ${t.p<0.001?"":"= "}${pf(t.p)}</div>`;
+}
+const ALERT_CLS={danger:"danger",warning:"warning",watch:"watch",good:"good",mixed:"mixed",none:"neutral"};
+function alertHtml(a){return a?`<span class="lv lv-${ALERT_CLS[a.level]||"neutral"}">${esc(a.text)}</span>`:'<span class="muted">–</span>'}
+function show(){
+  $("out").hidden=false;
+  let sig=0,tot=0;RES.places.forEach(p=>RES.vars.forEach(v=>{const t=p.vars[v.id].trend;if(t){tot++;if(t.significant)sig++}}));
+  $("sumtext").textContent=`${sig} of ${tot} results are significant at 95%. ${RES.period.text}.`;
+  let h="<thead><tr><th>Variable</th>"+RES.places.map(p=>`<th>${esc(p.name)}</th><th>Alert${RES.places.length>1?" · "+esc(p.name):""}</th>`).join("")+"</tr></thead><tbody>";
+  RES.vars.forEach(v=>{h+=`<tr><th scope="row" style="color:var(--ink)">${esc(v.name)}<div class="muted" style="font-weight:500">${esc(v.unit)}</div></th>`+RES.places.map((p,pi)=>`<td role="button" tabindex="0" data-p="${pi}" data-v="${v.id}">${cellHtml(p.vars[v.id].trend,p.vars[v.id].error)}</td><td role="button" tabindex="0" data-p="${pi}" data-v="${v.id}">${alertHtml(p.vars[v.id].alert)}</td>`).join("")+"</tr>"});
+  $("matrix").innerHTML=h+"</tbody>";
+  const failed=RES.places.filter(p=>p.error);if(failed.length)$("sumtext").textContent+=" No data for: "+failed.map(p=>p.name).join(", ")+".";
+  rankPlaces();safeStart();
+  detail(0,RES.vars[0].id,false);
+}
+const WETV=["GWETROOT","GWETTOP","GWETPROF"];
+const LVW={danger:3,warning:2,watch:1};
+function riskOf(p){let sc=0,n=0;RES.vars.forEach(v=>{const a=p.vars[v.id].alert;if(a){n++;sc+=LVW[a.level]||0}});return n?sc:null}
+function rankPlaces(){
+  const el=$("rankcard");
+  if(RES.places.length<3){el.hidden=true;return}
+  const soil=DOMAIN==="soil";
+  const rows=(soil?RES.places.map(p=>{let sc=0,n=0;WETV.forEach(id=>{const d=p.vars[id],t=d&&d.trend;if(t){n++;if(t.significant&&t.direction==="falling"&&t.mean)sc+=Math.max(0,-(t.slope_decade*10/t.rate_years)/Math.abs(t.mean)*100)}});return {name:p.name,sc:n?sc/n:null}}):RES.places.map(p=>({name:p.name,sc:riskOf(p)}))).filter(r=>r.sc!=null).sort((a,b)=>b.sc-a.sc);
+  if(!rows.length){el.hidden=true;return}
+  el.hidden=false;
+  const top=rows[0].sc||0,sev=r=>r.sc>0?(r.sc>=top*0.6?["High","danger"]:["Lower","watch"]):["None","good"];
+  el.innerHTML=`<h2>Places ranked by how severe the situation is</h2><div class="scroll"><table><thead><tr><th>#</th><th>Place</th><th>${soil?"Drying per decade":"Hazard score"}</th><th>Severity</th></tr></thead><tbody>${rows.map((r,k)=>{const v=sev(r);return `<tr><td><b>${k+1}</b></td><td>${esc(r.name)}</td><td>${soil?(r.sc>0?"-"+r.sc.toFixed(1)+"%":"none"):r.sc}</td><td><span class="lv lv-${v[1]}">${k===0&&r.sc>0?"Most severe":v[0]}</span></td></tr>`}).join("")}</tbody></table></div><p class="muted" style="font-size:14px;margin:6px 0 0">${soil?"Soil wetness trend. Regional, not one field.":"Score adds up the alerts: watch 1, warning 2, danger 3. Regional, not one beach."}</p>`;
+}
+function safeStart(){
+  const el=$("safecard");el.hidden=true;el.innerHTML="";return;
+  const p=RES.places[0],items=[];
+  RES.vars.forEach(v=>{const a=p.vars[v.id].alert;if(a&&LVW[a.level]&&a.recommend.length)items.push({v,a})});
+  items.sort((x,y)=>LVW[y.a.level]-LVW[x.a.level]);
+  if(!items.length){el.hidden=true;return}
+  const grp=[];items.forEach(i=>{const g=grp.find(x=>x[0].a.means===i.a.means);g?g.push(i):grp.push([i])});
+  el.hidden=false;const seen=new Set(),recs=[];items.forEach(i=>i.a.recommend.slice(0,2).forEach(r=>{if(!seen.has(r)&&recs.length<8){seen.add(r);recs.push(r)}}));
+  el.innerHTML=`<h2>Stay safe: ${esc(p.name)}</h2><div class="issue" style="margin-top:6px">${grp.slice(0,5).map(g=>{const i=g[0];return `<p style="margin:4px 0"><span class="lv lv-${ALERT_CLS[i.a.level]||"neutral"}">${esc(i.a.text)}</span> <b>${g.map(x=>esc(x.v.name)).join(" and ")}</b>: ${esc(i.a.means)}${i.a.ahead?` <span class="muted">${esc(i.a.ahead)}</span>`:""}</p>`}).join("")}</div><b>What to do</b><ul style="margin:4px 0 0;padding-left:20px">${recs.map(r=>`<li>${esc(r)}</li>`).join("")}</ul>`;
+}
+$("matrix").onclick=e=>{const c=e.target.closest("td[data-p]");if(c)detail(+c.dataset.p,c.dataset.v,true)};
+$("matrix").onkeydown=e=>{if(e.key==="Enter"||e.key===" "){const c=e.target.closest("td[data-p]");if(c){e.preventDefault();detail(+c.dataset.p,c.dataset.v,true)}}};
+
+function chart(d,v){
+  const pts=d.x.map((y,i)=>[y,d.values[i]]).filter(p=>p[1]!=null),t=d.trend;
+  const W=720,H=260,L=52,R=12,T=12,B=30,xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]).concat(t.sen.line.map(p=>p[1]),t.ols.line.map(p=>p[1]));
+  let lo=Math.min(...ys),hi=Math.max(...ys);const pad=(hi-lo||1)*0.12;lo-=pad;hi+=pad;
+  const x0=Math.min(...xs),x1=Math.max(...xs),X=x=>L+(x-x0)/(x1-x0||1)*(W-L-R),Y=y=>T+(hi-y)/(hi-lo)*(H-T-B);
+  let s=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" role="img" aria-label="Yearly ${esc(v.name)} with trend lines">`;
+  for(let i=0;i<=4;i++){const yy=lo+(hi-lo)*i/4;s+=`<line x1="${L}" x2="${W-R}" y1="${Y(yy)}" y2="${Y(yy)}" stroke="var(--line)"/><text x="${L-6}" y="${Y(yy)+4}" text-anchor="end">${fmt(yy,Math.abs(hi-lo)<2?2:1)}</text>`}
+  if(x1-x0<2.5){const lab=d.labels.filter((_,i)=>d.values[i]!=null),k=Math.min(5,pts.length-1);for(let q=0;q<=k;q++){const idx=Math.round(q*(pts.length-1)/(k||1));s+=`<text x="${X(pts[idx][0])}" y="${H-8}" text-anchor="${q===0?"start":q===k?"end":"middle"}" style="font-size:11px">${esc(lab[idx])}</text>`}}
+  else{const step=Math.max(1,Math.round((x1-x0)/8/5)*5)||5;for(let y=Math.ceil(x0/step)*step;y<=x1;y+=step)s+=`<text x="${X(y)}" y="${H-8}" text-anchor="middle">${y}</text>`}
+  s+=`<polyline fill="none" stroke="var(--mute)" stroke-width="1.2" opacity=".6" points="${pts.map(p=>X(p[0])+","+Y(p[1])).join(" ")}"/>`;
+  pts.forEach(p=>s+=`<circle cx="${X(p[0])}" cy="${Y(p[1])}" r="3" fill="var(--mute)"/>`);
+  const col=!t.significant?"var(--flat)":t.direction==="rising"?"var(--up)":"var(--down)";
+  s+=`<line x1="${X(t.ols.line[0][0])}" y1="${Y(t.ols.line[0][1])}" x2="${X(t.ols.line[1][0])}" y2="${Y(t.ols.line[1][1])}" stroke="var(--brand)" stroke-width="2" stroke-dasharray="6 4"/>`;
+  s+=`<line x1="${X(t.sen.line[0][0])}" y1="${Y(t.sen.line[0][1])}" x2="${X(t.sen.line[1][0])}" y2="${Y(t.sen.line[1][1])}" stroke="${col}" stroke-width="3"/>`;
+  return s+"</svg>";
+}
+function detail(pi,vid,scroll){
+  const p=RES.places[pi],v=RES.vars.find(x=>x.id===vid),d=p.vars[vid],t=d.trend,el=$("detail");el.hidden=false;
+  if(!t){el.innerHTML=`<h2>${esc(v.name)} · ${esc(p.name)}</h2><p class="muted">No data.</p>`;return}
+  const col=!t.significant?"flat":t.direction==="rising"?"up":"down";
+  const rows=(a)=>a.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("");
+  el.innerHTML=`<div class="row" style="align-items:center;justify-content:space-between"><div><h2 style="margin:0">${esc(v.name)} · ${esc(p.name)}</h2><div class="muted">${esc(v.source)}</div></div>
+   <div><span class="badge ${t.significant?"yes":"no"} big">${t.verdict}</span> <span class="badge ${col} big">${t.direction}</span></div></div>
+   <p style="font-size:17px;margin:10px 0">${esc(t.sentence)}</p>${t.warnings.map(w=>`<div class="note">${esc(w)}</div>`).join("")}
+   ${chart(d,v)}
+   <div class="legend"><span><i class="sw" style="border-color:var(--${col==="flat"?"flat":col==="up"?"up":"down"})"></i>Theil-Sen trend</span><span><i class="sw" style="border-color:var(--brand);border-top-style:dashed"></i>Regression line</span><span><i class="sw" style="border-color:var(--mute);height:0;border-top-width:6px;width:6px;border-radius:50%"></i>Value (${esc(v.unit)})</span></div>
+   <div class="two" style="margin-top:14px">
+    <div class="scroll"><h3>Rate of change</h3><table class="stat">${rows([
+      ["Change per "+t.rate_label+" (Theil-Sen)",`<b>${sgn(t.sen.slope_decade)} ${esc(v.unit)}</b>`],
+      ["95% confidence interval",`${sgn(t.sen.ci_low)} to ${sgn(t.sen.ci_high)} ${esc(v.unit)} per ${t.rate_label}`],
+      ["Total change over the period",`${sgn(t.total)} ${esc(v.unit)}`+(t.pct!=null?` (${sgn(t.pct,1)}%)`:"")],
+      ["Average level",`${fmt(t.mean)} ${esc(v.unit)}`],
+      [t.monthly?"Monthly values used":"Years used",t.n],["First to last value",esc(d.labels[0])+" to "+esc(d.labels[d.labels.length-1])]])}</table></div>
+    <div class="scroll"><h3>Significance tests</h3><table class="stat">${rows([
+      [esc(t.test_name)+" (final verdict)",`p ${t.mk.p<0.001?"":"= "}${pf(t.mk.p)} · Z = ${fmt(t.mk.z)} · τ = ${fmt(t.mk.tau)} → <span class="badge ${t.mk.significant?"yes":"no"}">${t.mk.significant?"significant":"not significant"}</span>`],
+      ["t-test on regression slope",`slope ${sgn(t.ols.slope_decade)} per ${t.rate_label} · t = ${fmt(t.ols.t)} (${t.ols.df} df) · p ${t.ols.p<0.001?"":"= "}${pf(t.ols.p)} → <span class="badge ${t.ols.significant?"yes":"no"}">${t.ols.significant?"significant":"not significant"}</span>`],
+      ["95% CI of regression slope",`${sgn(t.ols.ci_low)} to ${sgn(t.ols.ci_high)} per ${t.rate_label} (R² = ${fmt(t.ols.r2)})`],
+      ["95% CI of Theil-Sen slope",`${sgn(t.sen.ci_low)} to ${sgn(t.sen.ci_high)} per ${t.rate_label} → ${t.sen.significant?"excludes zero":"includes zero"}`],
+      ["Methods agree?",t.agree?"Yes":'<span class="badge warn">No: borderline</span>'],
+      ["Year-to-year similarity",fmt(t.lag1)]])}</table></div></div>
+   ${outlookHtml(d,v)}
+   <details style="margin-top:12px"><summary>Show the values</summary><div class="scroll"><table><thead><tr><th>Period</th><th>${esc(v.name)} (${esc(v.unit)})</th></tr></thead><tbody>${d.labels.map((y,i)=>`<tr><td>${esc(y)}</td><td>${d.values[i]==null?"–":fmt(d.values[i],3)}</td></tr>`).join("")}</tbody></table></div></details>
+   <div id="causes" class="noprint" style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px"></div>`;
+  causeStart(pi,vid);calStart(pi);
+  if(scroll)el.scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+
+function outlookHtml(d,v){
+  const o=d.outlook;
+  if(!o)return `<div class="note" style="margin-top:12px">Long-term outlook: no clear trend, so no projection.</div>`;
+  return `<div class="scroll" style="margin-top:14px"><h3>Long-term outlook (if it continues)</h3><table><thead><tr><th>Year</th><th>Expected (${esc(v.unit)})</th><th>Change from now</th><th>Likely range</th></tr></thead><tbody>${o.rows.map(r=>`<tr><td><b>${r.year}</b></td><td>${fmt(r.value)}</td><td>${sgn(r.change)}</td><td>${fmt(r.low)} to ${fmt(r.high)}</td></tr>`).join("")}</tbody></table><p class="muted" style="font-size:13px;margin:4px 0 0">${esc(o.note)}</p></div>`;
+}
+/* ---------- possible causes ---------- */
+const CAUSES={};
+function causeStart(pi,vid){
+  const el=$("causes"),v=RES.vars.find(x=>x.id===vid),t=RES.places[pi].vars[vid].trend,key=pi+"|"+vid;
+  if(LASTBODY.mode==="day"){el.innerHTML='<h2>Possible causes</h2><p class="muted">Needs yearly or monthly data.</p>';return}
+  if(!CFG.causes_for.includes(vid)){el.innerHTML="";return}
+  const hint=t&&t.significant?`Why is it ${t.direction}?`:`Not significant. You can still look.`;
+  el.innerHTML=`<h2>Possible causes</h2><p class="muted" style="margin:0 0 10px">${hint}</p><button id="cgo">Find possible causes</button> <button id="rgo" class="alt">Recommendation and verdict</button> <span id="cst" class="muted" role="status"></span><div id="recbox" style="margin-top:12px"></div><div id="causebody"></div>`;
+  $("rgo").onclick=async()=>{
+    const a=RES.places[pi].vars[vid].alert,box=$("recbox");if(!a){box.innerHTML="";return}
+    let C=CAUSES[key];
+    if(!C&&LASTBODY.mode!=="day"){box.innerHTML='<p class="muted" role="status">Checking…</p>';
+      try{const b=LASTBODY,pl=RES.places[pi];C=CAUSES[key]=await api("/api/causes",{domain:DOMAIN,place:{name:pl.name,lat:pl.lat,lon:pl.lon},target:vid,y0:b.y0,m0:b.m0,y1:b.y1,m1:b.m1,months:b.months,mode:b.mode})}catch(e){C=null}}
+    if($("recbox")===box)box.innerHTML=verdictHtml(a,C,pi);
+  };
+  if(CAUSES[key]){causeShow(el,CAUSES[key]);}
+  $("cgo").onclick=async()=>{
+    $("cgo").disabled=true;$("cst").textContent="Testing…";
+    try{const b=LASTBODY,pl=RES.places[pi];
+      CAUSES[key]=await api("/api/causes",{domain:DOMAIN,place:{name:pl.name,lat:pl.lat,lon:pl.lon},target:vid,y0:b.y0,m0:b.m0,y1:b.y1,m1:b.m1,months:b.months,mode:b.mode});
+      if($("causes")===el){causeShow(el,CAUSES[key]);$("cst").textContent="";$("cgo").disabled=false}}
+    catch(e){$("cst").innerHTML='<span class="err">'+esc(e.message)+"</span>";$("cgo").disabled=false}
+  };
+}
+function zs(a){const m=a.reduce((x,y)=>x+y,0)/a.length,sd=Math.sqrt(a.reduce((x,y)=>x+(y-m)*(y-m),0)/a.length)||1;return a.map(v=>(v-m)/sd)}
+function overlay(a,b,na,nb,ca,cb,ta,tb){
+  const W=640,H=190,L=34,R=10,T=10,B=24,A=a?zs(a.values):[],Bz=zs(b.values),all=A.concat(Bz),lo=Math.min(...all)-.2,hi=Math.max(...all)+.2,xs=(a?a.x:[]).concat(b.x),x0=Math.min(...xs),x1=Math.max(...xs);
+  const X=x=>L+(x-x0)/(x1-x0||1)*(W-L-R),Y=y=>T+(hi-y)/(hi-lo)*(H-T-B),line=(s,z,c)=>`<polyline fill="none" stroke="${c}" stroke-width="2" points="${s.x.map((x,i)=>X(x)+","+Y(z[i])).join(" ")}"/>`;
+  let g=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" role="img" aria-label="${esc(a?na+' and '+nb+' compared':nb+' trend')}"><line x1="${L}" x2="${W-R}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--line)"/>`;
+  const step=Math.max(1,Math.round((x1-x0)/6/5)*5)||5;for(let y=Math.ceil(x0/step)*step;y<=x1;y+=step)g+=`<text x="${X(y)}" y="${H-6}" text-anchor="middle">${y}</text>`;
+  const tcol=t=>!t||!t.significant?"var(--flat)":t.direction==="rising"?"var(--up)":"var(--down)";
+  const tline=(s,z,t)=>{if(!t)return "";const n=z.length,mx=s.x.reduce((p,q)=>p+q,0)/n,my=z.reduce((p,q)=>p+q,0)/n;let num=0,den=0;s.x.forEach((x,i)=>{num+=(x-mx)*(z[i]-my);den+=(x-mx)*(x-mx)});const k=den?num/den:0,xa=Math.min(...s.x),xb=Math.max(...s.x);return `<line x1="${X(xa)}" y1="${Y(my+k*(xa-mx))}" x2="${X(xb)}" y2="${Y(my+k*(xb-mx))}" stroke="${tcol(t)}" stroke-width="4" stroke-linecap="round"/>`};
+  const tl=(a?tline(a,A,ta):"")+tline(b,Bz,tb);
+  const tleg=ta||tb?`<span><i class="sw" style="border-color:var(--up);border-top-width:4px"></i>Straight line: trend (red rising, blue falling, grey none)</span>`:"";
+  return g+(a?line(a,A,ca):"")+line(b,Bz,cb)+tl+`</svg><div class="legend">${a?`<span><i class="sw" style="border-color:${ca}"></i>${esc(na)}</span>`:""}<span><i class="sw" style="border-color:${cb}"></i>${esc(nb)}</span>${a?"<span>Same scale.</span>":""}${tleg}</div>`;
+}
+function badgeFor(d){const l=d.label;return `<span class="badge ${d.score>=3&&d.kind==="normal"?"yes":d.score>=2||l.startsWith("Fits")||l.startsWith("Explains")?"warn":"no"}">${esc(l)}</span>`}
+function dirTxt(t,u){return t&&t.significant?(t.direction==="rising"?"▲ rising":"▼ falling")+" "+sgn(t.slope_decade,3)+" "+esc(u)+" per decade":"— no clear trend"}
+function causeShow(el,R){
+  const T=R.target,B=R.best,tt=T.trend;
+  let h=`<h2>Possible causes of the change in ${esc(T.name.toLowerCase())}</h2>
+`;
+  if(B.drivers&&B.drivers.length){
+    h+=`<h3>Best estimate</h3><p style="margin:0 0 6px">${esc(B.text)}</p>`;
+    h+=`<div class="scroll"><table><thead><tr><th>Driver</th><th>Its own trend per decade</th><th>Effect on target per unit</th><th>Part of the trend</th></tr></thead><tbody>`+B.drivers.map(d=>`<tr><td>${esc(d.name)}</td><td>${sgn(d.driver_trend_decade,3)} ${esc(d.driver_unit)}</td><td>${sgn(d.sensitivity,3)} ${esc(T.unit)} per ${esc(d.driver_unit||"unit")}</td><td><b>${(d.share*100).toFixed(0)}%</b> (${sgn(d.contribution_decade,3)} ${esc(T.unit)}/decade)</td></tr>`).join("")+`</tbody></table></div>`;
+    h+=overlay({x:B.series.x,values:B.series.actual},{x:B.series.x,values:B.series.modelled},"Actual "+T.name.toLowerCase(),"Rebuilt from these drivers","var(--mute)","var(--brand)");
+  }
+  if(B.fits_direction&&B.fits_direction.length)h+=`<p class="muted">Fits, but cannot be tested: ${B.fits_direction.map(x=>esc(x.name)).join(", ")}.</p>`;
+  h+=`<h3>Candidates</h3>`;
+  R.drivers.forEach((d,i)=>{
+    if(d.error){h+=`<div class="cause"><div style="padding:12px 14px"><b>${esc(d.name)}</b> <span class="badge no">No data</span><div class="muted" style="font-size:14px">${esc(d.error)}</div></div></div>`;return}
+    const dt=d.trend;
+    h+=`<details class="cause" data-i="${i}"><summary><span><b>${esc(d.name)}</b><div class="muted" style="font-size:14px;font-weight:500">${dirTxt(dt,d.unit)} · expected: ${esc(d.expected)}</div></span>${badgeFor(d)}</summary><div class="in">
+     <p style="margin:0 0 8px">${esc(d.mechanism)}</p>
+     ${d.may_be_feedback?'<div class="note">Moves at the same time. May be a result too.</div>':""}${d.may_be_effect?'<div class="note">May be a result, not a cause.</div>':""}
+     ${d.checks.map(c=>`<div class="chk"><b class="${c.ok?"y":"n"}">${c.ok?"✓":"–"}</b><span><b>${esc(c.name)}.</b> ${esc(c.text)}</span></div>`).join("")}
+     ${d.kind==="untestable"?'<div class="note">Straight-line change: only direction and physics can be judged.</div>':""}
+     <div class="muted" style="font-size:14px;margin:6px 0">${esc(d.lead_text)} r = ${sgn(d.r_raw)}.</div>
+     ${overlay(null,d.series,T.name,d.name,"var(--mute)","var(--brand)",null,dt)}
+     </div></details>`;
+  });
+  h+=R.notes.map(n=>`<p class="muted" style="font-size:13px;margin:6px 0">${esc(n)}</p>`).join("");
+  (el.querySelector("#causebody")||el).innerHTML=h;
+}
+
+/* ---------- sea calendar ---------- */
+const CAL={};
+async function calStart(pi){
+  const el=$("calcard"),b=LASTBODY,pl=RES.places[pi],key=pi+"|"+b.y0+"|"+b.y1;
+  if(b.mode==="day"){el.hidden=true;return}
+  el.hidden=false;el.innerHTML=`<h2>${DOMAIN==="soil"?"Farm":"Sea"} calendar: ${esc(pl.name)}</h2><p class="muted" role="status">Loading…</p>`;
+  try{if(!CAL[key])CAL[key]=await api("/api/calendar",{domain:DOMAIN,place:{name:pl.name,lat:pl.lat,lon:pl.lon},y0:b.y0,m0:1,y1:b.y1,m1:12,months:[1,2,3,4,5,6,7,8,9,10,11,12]});
+    if($("calcard")!==el)return;const R=CAL[key];
+    if(DOMAIN==="soil"){el.innerHTML=`<h2>Farm calendar: ${esc(pl.name)} (average year)</h2><div class="scroll"><table><thead><tr><th>Month</th><th>Rain (mm)</th><th>Soil wetness</th><th>Temp</th><th>Notes</th></tr></thead><tbody>${R.calendar.map(c=>`<tr><td><b>${esc(c.month)}</b></td><td>${c.rain_mm==null?"–":c.rain_mm.toFixed(0)}</td><td>${c.root==null?"–":c.root.toFixed(2)}</td><td>${c.t==null?"–":c.t.toFixed(0)} °C</td><td>${c.good?'<span class="badge yes">Good to grow</span> ':""}${c.flags.map(f=>`<span class="badge ${f==="Soil dry"||f==="Heat stress"?"warn":"no"}">${esc(f)}</span>`).join(" ")}</td></tr>`).join("")}</tbody></table></div><ul style="margin:8px 0;padding-left:20px">${R.summary.map(([a,b])=>`<li><b>${esc(a)}:</b> ${esc(b)}</li>`).join("")}</ul>`;return}
+    const SW={Good:"good",Caution:"watch",Avoid:"danger"};
+    el.innerHTML=`<h2>Sea calendar: ${esc(pl.name)} (average year)</h2><div class="scroll"><table><thead><tr><th>Month</th><th>Swimming</th><th>Sea °C</th><th>Wind m/s</th><th>Rain (mm)</th><th>Waves (m)</th><th>Why</th></tr></thead><tbody>${R.calendar.map(c=>`<tr><td><b>${esc(c.month)}</b></td><td><span class="lv lv-${SW[c.swim]||"neutral"}">${esc(c.swim)}</span></td><td>${c.sea==null?"–":c.sea.toFixed(1)}</td><td>${c.wind==null?"–":c.wind.toFixed(1)}</td><td>${c.rain_mm==null?"–":c.rain_mm.toFixed(0)}</td><td>${c.wave==null?"–":c.wave.toFixed(1)}</td><td>${c.hazards.length?esc(c.hazards.join(", ")):'<span class="muted">No big hazard</span>'}${c.flags.length?`<div class="muted" style="font-size:13px">${esc(c.flags.join(", "))}</div>`:""}</td></tr>`).join("")}</tbody></table></div>
+    <div class="legend" style="margin-top:8px">${R.summary.map(s=>`<span><b>${esc(s[0])}:</b> ${esc(s[1])}</span>`).join("")}</div>
+    <h3>Swimming safety</h3><ul style="margin:4px 0 0;padding-left:20px">${CFG.swim_tips.map(t=>`<li>${esc(t)}</li>`).join("")}</ul><p class="muted" style="font-size:13px;margin:6px 0 0">Ratings come from monthly averages, not a beach forecast. Waves show only when the optional wave data loads. Always follow lifeguards and local flags.</p>`}
+  catch(e){el.innerHTML=`<h2>Sea calendar</h2><div class="err">${esc(e.message)}</div>`}
+}
+/* ---------- recommendation and verdict ---------- */
+function verdictHtml(a,C,pi){
+  let cause=a.cause,linked=[];
+  const P=RES.places[pi];
+  if(C){const best=(C.best&&C.best.drivers)||[];
+    if(best.length)cause="Likely "+best.map(d=>d.name.toLowerCase()).join(" and ")+" (found in the data).";
+    else{const s=(C.drivers||[]).filter(d=>d.score>=3&&d.kind==="normal");cause=s.length?"Likely "+s[0].name.toLowerCase()+" (found in the data).":(a.cause?a.cause+" The tests could not pick one.":"")}
+    (C.drivers||[]).filter(d=>!d.error&&d.score>=2&&d.harm).forEach(d=>linked.push({name:d.name,text:d.harm.text,policy:d.harm.policy}));
+  }
+  const cls=ALERT_CLS[a.level]||"neutral";
+  let h=`<div class="issue"><div class="row" style="justify-content:space-between;align-items:center"><h3>Verdict</h3><span class="lv lv-${cls}">${esc(a.verdict)}</span></div>`;
+  if(a.verdict!=="No change"&&cause)h+=`<p style="margin:4px 0"><b>Possible cause:</b> ${esc(cause)}</p>`;
+  h+=`<p style="margin:4px 0"><b>What it means:</b> ${esc(a.means)}</p>`;
+  if(a.ahead)h+=`<p style="margin:4px 0"><b>If it continues:</b> ${esc(a.ahead)}</p>`;
+  if(linked.length)h+=`<p style="margin:4px 0"><b>Linked harmful trends:</b> ${linked.map(l=>esc(l.name)+" ("+esc(l.text)+")").join(", ")}.</p>`;
+  const pol=[],seen=new Set();[a].concat(linked).forEach(x=>(x.policy||[]).forEach(t=>{if(!seen.has(t)&&pol.length<7){seen.add(t);pol.push(t)}}));
+  if(a.verdict==="Not good"&&pol.length)h+=`<div><b>Precaution policy:</b><ul style="margin:4px 0 0;padding-left:20px">${pol.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`;
+  if(a.verdict==="Not good"&&a.recommend.length)h+=`<div style="margin-top:6px"><b>What people can do:</b><ul style="margin:4px 0 0;padding-left:20px">${a.recommend.slice(0,3).map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`;
+  return h+`</div>`;
+}
+async function download(path,name){
+  try{const r=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(LASTBODY)});if(!r.ok)throw 0;
+    const b=await r.blob(),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)}
+  catch(e){$("sumtext").textContent="Could not make the file. Run the analysis again."}
+}
+$("dl1").onclick=()=>download("/api/csv_results","trend_results.csv");
+$("dl2").onclick=()=>download("/api/csv_series","yearly_values.csv");
+$("pr").onclick=()=>window.print();
+
+function setDomain(d){
+  DOMAIN=d;document.body.dataset.sec=d;selected.clear();(CFG.defaults[d]||[]).forEach(v=>selected.add(v));places.length=0;renderChips();RES=null;
+  renderVars();$("out").hidden=true;$("status").textContent="";
+  $("landing").hidden=true;$("app").hidden=false;$("switchwrap").hidden=false;
+  $("sub").textContent=d==="soil"?"Soil section: find where the soil is slowly drying.":"Coastal area section: check sea and coast trends and assess risk.";
+  $("q").placeholder=d==="soil"?"Dubai, Nairobi, Oslo…":"Dubai, Mombasa, Miami…";
+  $("regnote").textContent=d==="soil"?"Regional data (about 50 km), not one field.":"Regional data (about 25 to 50 km), not one beach.";
+  if(map)setTimeout(()=>map.invalidateSize(),60);
+}
+async function start(){
+  CFG=await api("/api/config");
+  const MN=["January","February","March","April","May","June","July","August","September","October","November","December"];
+  $("m0").innerHTML=MN.map((m,i)=>`<option value="${i+1}">${m}</option>`).join("");$("m1").innerHTML=$("m0").innerHTML;$("m1").value=12;
+  $("mchecks").innerHTML=MN.map((m,i)=>`<label><input type="checkbox" value="${i+1}" checked><span>${m.slice(0,3)}</span></label>`).join("");
+  document.querySelectorAll("[data-season]").forEach(b=>b.onclick=()=>{const set=new Set(b.dataset.season.split(",").map(Number));document.querySelectorAll("#mchecks input").forEach(c=>c.checked=set.has(+c.value))});
+  $("y0").value=CFG.first_year;$("y1").value=CFG.last_year;$("y0").min=CFG.first_year;$("y1").max=CFG.max_year;
+  try{map=L.map("map",{worldCopyJump:true}).setView([25,30],2);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:12,attribution:"© OpenStreetMap contributors"}).addTo(map);
+    map.on("click",e=>addPlace(e.latlng.lat,((e.latlng.lng+540)%360)-180))}
+  catch(e){map=null;$("maperr").hidden=false}
+  const iso=d=>d.toISOString().slice(0,10),end=new Date(Date.now()-6*864e5),beg=new Date(end.getTime()-59*864e5);$("d0").value=iso(beg);$("d1").value=iso(end);$("d1").max=iso(end);
+  const tog=()=>{const dm=modeNow()==="day";$("daybox").hidden=!dm;$("monthbox").hidden=dm};document.querySelectorAll("input[name=mode]").forEach(x=>x.onchange=tog);tog();
+  renderChips();
+  $("go-coast").onclick=()=>setDomain("coast");$("go-soil").onclick=()=>setDomain("soil");
+  $("switch").onclick=()=>{$("app").hidden=true;delete document.body.dataset.sec;$("landing").hidden=false;$("switchwrap").hidden=true;$("sub").textContent="Coastal Area and Soil Trend Detection"};
+}
+start().catch(e=>{$("status").textContent="Could not start: "+e.message});
+window.__t={addPlace,places:()=>places,RES:()=>RES,CAUSES};
+</script>
+</body>
+</html>
