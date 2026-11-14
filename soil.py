@@ -399,11 +399,6 @@ for _v in ("SM010", "SM1040", "SM40100", "SM100200"):
     _L = {"SM010": "The top 10 cm of soil", "SM1040": "The soil at 10 to 40 cm", "SM40100": "The root zone (40 to 100 cm)", "SM100200": "The deep soil (100 to 200 cm)"}[_v]
     _OTHER_ALERT[_v] = {"falling": ("watch", "Early warning: drying", "Not good", f"{_L} holds less water each year.", _DRY_CAUSE, _MEANING["dry"]["falling"][3]),
                         "rising": ("good", "Good: more soil water", "Good", f"{_L} holds more water each year. Watch for waterlogging if it keeps rising.", _WET_CAUSE, [])}
-for _v, _L in (("MM_SMD", ""),):
-    _drying = _v != "MM_SMD"      # a larger moisture deficit means a DRIER soil
-    _dry = ("watch", "Early warning: drying", "Not good", (f"{_L} holds less water each year." if _L else "The soil water shortage is getting bigger."), _DRY_CAUSE, _MEANING["dry"]["falling"][3])
-    _wet = ("good", "Good: more soil water", "Good", (f"{_L} holds more water each year." if _L else "The soil water shortage is getting smaller."), _WET_CAUSE, [])
-    _OTHER_ALERT[_v] = {"falling": _dry, "rising": _wet} if _drying else {"rising": _dry, "falling": _wet}
 _OTHER_ALERT["STMP"] = _OTHER_ALERT["TS"]
 _OTHER_ALERT["PRECIP"] = _OTHER_ALERT["PRECTOTCORR"]
 _OTHER_ALERT["ET"] = {"rising": ("mixed", "Mixed: more water leaves", "Mixed", "More water goes back to the air. Plants may be growing more, or the land is losing water faster.", "Hotter, sunnier or windier weather, or more plant cover.", []),
