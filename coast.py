@@ -16,7 +16,7 @@ _RISE = {
     "TS": (0.1, 0.25, 0.5), "SST_OI": (0.1, 0.25, 0.5),
     "SEALEVEL": (10, 37, 60),
     "WS10M": (0.05, 0.15, 0.3), "WS50M": (0.05, 0.15, 0.3),
-    "WAVE": (0.03, 0.08, 0.15), "MM_SWELL": (0.03, 0.08, 0.15),
+    "WAVE": (0.03, 0.08, 0.15),
     "T2M": (0.1, 0.3, 0.5), "T2M_MAX": (0.1, 0.3, 0.5),
 }
 
@@ -83,7 +83,7 @@ def soil_policy(vid: str, alert: dict | None, trend: dict | None) -> list:
     return list(POLICY["soil_wet" if (trend or {}).get("direction") == "rising" else "soil_dry"])
 
 
-_POLICY_KEY = {"TS": "sea", "SST_OI": "sea", "SEALEVEL": "level", "WS10M": "wind", "WS50M": "wind", "WAVE": "wave", "MM_SWELL": "wave", "T2M": "heat", "T2M_MAX": "heat"}
+_POLICY_KEY = {"TS": "sea", "SST_OI": "sea", "SEALEVEL": "level", "WS10M": "wind", "WS50M": "wind", "WAVE": "wave", "T2M": "heat", "T2M_MAX": "heat"}
 
 
 # which driver trends are harmful for the coast: id -> (direction that is harmful, plain words, policy key)
@@ -125,9 +125,9 @@ def _level(vid: str, rate: float) -> str:
 
 
 _TEXT = {"TS": "Early warning: warming sea", "SST_OI": "Early warning: warming sea", "SEALEVEL": "Early warning: rising sea",
-         "WS10M": "Early warning: stronger wind", "WS50M": "Early warning: stronger wind", "WAVE": "Early warning: bigger waves", "MM_SWELL": "Early warning: bigger waves",
+         "WS10M": "Early warning: stronger wind", "WS50M": "Early warning: stronger wind", "WAVE": "Early warning: bigger waves",
          "T2M": "Early warning: hotter air", "T2M_MAX": "Early warning: hotter days"}
-_KIND = {"TS": _SEA_WARM, "SST_OI": _SEA_WARM, "SEALEVEL": _SEA_LEVEL, "WS10M": _WIND, "WS50M": _WIND, "WAVE": _WAVE, "MM_SWELL": _WAVE, "T2M": _HEAT, "T2M_MAX": _HEAT}
+_KIND = {"TS": _SEA_WARM, "SST_OI": _SEA_WARM, "SEALEVEL": _SEA_LEVEL, "WS10M": _WIND, "WS50M": _WIND, "WAVE": _WAVE, "T2M": _HEAT, "T2M_MAX": _HEAT}
 
 
 def _core(vid: str, t: dict | None) -> dict | None:

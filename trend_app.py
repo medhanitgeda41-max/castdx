@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """CASTD, Coastal Area and Soil Trend Detection: choose the coast section or the soil section, pick places on a map, choose measures, and see which ones are changing, whether the change is significant, the long-term outlook and what to do.
 
-    python trend_app.py            starts http://127.0.0.1:9029 and opens it in your browser
+    python trend_app.py            starts http://127.0.0.1:9032 and opens it in your browser
 
 Data: NASA POWER (power.larc.nasa.gov), 1981 to the last full year, plus optional NOAA, PSMSL and Open-Meteo sea data (ocean.py). Statistics: stats.py (regression + t-test, Mann-Kendall, Theil-Sen with 95% interval).
 """
@@ -25,15 +25,15 @@ BASE = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 sys.path.insert(0, str(BASE))
 
 import causes       # noqa: E402
+import climate      # noqa: E402
 import events       # noqa: E402
 import coast        # noqa: E402
 import soil         # noqa: E402
 import ocean        # noqa: E402
 import stats        # noqa: E402
-import meteomatics  # noqa: E402
 import trends       # noqa: E402
 
-DEFAULT_PORT = 9029             # changed on every new release so an older copy still running does not answer instead
+DEFAULT_PORT = 9032             # changed on every new release so an older copy still running does not answer instead
 GETTER = trends.get_json        # tests replace this
 
 
@@ -136,8 +136,8 @@ def _run(body: dict) -> dict:
 
 def api_config(_q=None) -> dict:
     today = date.today()
-    return {"variables": [v for v in trends.BY_ID.values() if v["id"] in trends.selectable()], "default_vars": trends.DEFAULT_SELECTION, "defaults": trends.DEFAULTS, "soil_limit_note": soil.LIMIT_NOTE, "first_year": trends.FIRST_YEAR,
-            "last_year": today.year - 1, "max_year": today.year, "min_years": stats.MIN_YEARS, "causes_for": list(causes.KB), "event_guide": events.guide(), "ocean_selection": trends.OCEAN_SELECTION, "limit_note": coast.LIMIT_NOTE, "swim_tips": coast.SWIM_TIPS, "outlook_years": coast.OUTLOOK_YEARS, "meteomatics": meteomatics.enabled(), "google_key": os.environ.get("GOOGLE_MAPS_API_KEY", "")}
+    return {"variables": [v for v in trends.BY_ID.values() if v["id"] in trends.SELECTABLE], "default_vars": trends.DEFAULT_SELECTION, "defaults": trends.DEFAULTS, "soil_limit_note": soil.LIMIT_NOTE, "first_year": trends.FIRST_YEAR,
+            "last_year": today.year - 1, "max_year": today.year, "min_years": stats.MIN_YEARS, "causes_for": list(causes.KB), "event_guide": events.guide(), "ocean_selection": trends.OCEAN_SELECTION, "limit_note": coast.LIMIT_NOTE, "swim_tips": coast.SWIM_TIPS, "outlook_years": coast.OUTLOOK_YEARS, "google_key": os.environ.get("GOOGLE_MAPS_API_KEY", ""), "projection_for": climate.APPLY}
 
 
 def api_csv(body: dict, kind: str) -> bytes:
@@ -192,6 +192,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(_causes(body))
             elif p == "/api/calendar":
                 self._json(_calendar(body))
+            elif p == "/api/projection":
+                self._json(climate.project(float(body["lat"]), float(body["lon"]), int(body.get("year") or 2040), "soil" if str(body.get("domain")) == "soil" else "coast", vid=str(body.get("vid") or "")))
             elif p == "/api/eonet":
                 self._json(_eonet(body))
             elif p == "/api/events":
@@ -212,11 +214,12 @@ def main():
     ap.add_argument("--port", type=int, default=DEFAULT_PORT)
     ap.add_argument("--no-browser", action="store_true")
     a = ap.parse_args()
-    srv = None
+    import os
     hosted = bool(os.environ.get("PORT"))          # web hosts give the port in PORT
     host = "0.0.0.0" if hosted else "127.0.0.1"
     if hosted:
         a.port = int(os.environ["PORT"]); a.no_browser = True
+    srv = None
     for port in range(a.port, a.port + (1 if hosted else 30)):
         try:
             srv = ThreadingHTTPServer((host, port), Handler)

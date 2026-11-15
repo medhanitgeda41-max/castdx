@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CASTD: Coastal Area and Soil Trend Detection</title>
-<link rel="stylesheet" href="/lib/maplibre-gl.css">
 <style>
 :root{color-scheme:dark;--page:#0f1923;--bg:#0d1620;--card:#17222d;--ink:#eef3f8;--mute:#9db0c1;--line:#27343f;--brand:#4cc3e0;--brand2:#143440;--up:#ff8f85;--up-bg:#3b2020;--down:#8fbcff;--down-bg:#1b2d44;--flat:#9db0c1;--flat-bg:#212d39;--ok:#6fdc9a;--ok-bg:#15332a;--warn:#f2c15f;--warn-bg:#3a2f17;--font:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif}
 *{box-sizing:border-box}[hidden]{display:none!important}
@@ -16,7 +15,7 @@ main{max-width:1120px;margin:0 auto;padding:8px 20px 60px;display:grid;grid-temp
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
 .two{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px}
 @media (max-width:860px){.two{grid-template-columns:minmax(0,1fr)}}
-#map{height:420px;border-radius:10px;border:1px solid var(--line);background:var(--brand2)}
+#map{height:340px;border-radius:10px;border:1px solid var(--line);background:var(--brand2)}
 #maperr{color:var(--mute);padding:14px}
 label{display:block;font-weight:600;font-size:14px;margin:10px 0 4px}
 input[type=text],input[type=number],select{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink);font:inherit}
@@ -89,7 +88,7 @@ body[data-sec] #sub{color:var(--brand);font-weight:600}
   <div class="card">
     <h2>1. Choose places</h2>
     <p class="muted" style="margin:0 0 8px">Click the sea or coast on the map, or search.</p>
-    <p class="muted" id="globesrc" style="margin:0 0 4px;font-size:13px"></p><div id="map" aria-label="3D globe. Click to add a place. Drag to turn it."><div id="maperr" hidden>The map could not load. Use the search box or type coordinates.</div></div>
+    <div id="map" aria-label="Google 3D globe. Click to add a place."><div id="maperr" hidden>The Google 3D globe could not load. Use the search box or type coordinates.</div></div>
     <div class="row" style="margin-top:6px">
       <div class="grow"><label for="q">Search a place</label><input type="text" id="q" placeholder="Dubai, Mombasa, Miami…"></div>
       <button class="alt" id="qgo">Search</button>
@@ -146,11 +145,58 @@ body[data-sec] #sub{color:var(--brand);font-weight:600}
 </section>
 
 </main>
-<script src="/lib/maplibre-gl.js"></script>
 <script>
 "use strict";
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let GM3=null;
+function loadGoogle(key){
+  return new Promise((res,rej)=>{
+    const t=setTimeout(()=>rej(new Error("took too long")),12000);
+    window.gm_authFailure=()=>{clearTimeout(t);rej(new Error("Google refused the key"))};
+    window.__gmReady=()=>{clearTimeout(t);res()};
+    const s=document.createElement("script");s.async=true;s.onerror=()=>{clearTimeout(t);rej(new Error("script not reachable"))};
+    s.src="https://maps.googleapis.com/maps/api/js?key="+encodeURIComponent(key)+"&v=beta&loading=async&callback=__gmReady";
+    document.head.append(s)})
+}
+async function initGoogleGlobe(){
+  if(!CFG.google_key)throw new Error("no key");
+  await loadGoogle(CFG.google_key);
+  GM3=await google.maps.importLibrary("maps3d");
+  const m=new GM3.Map3DElement({mode:"HYBRID",center:{lat:22,lng:30,altitude:0},range:18000000,tilt:0,heading:0});
+  m.style.cssText="width:100%;height:100%;display:block";
+  m.addEventListener("gmp-error",()=>{$("maperr").textContent="Google 3D globe error. Use the search box or type coordinates.";$("maperr").hidden=false});
+  m.addEventListener("gmp-click",e=>{const p=e.position;if(p)addPlace(p.lat,((p.lng+540)%360)-180)});
+  $("map").prepend(m);map=m;
+}
+let PYEAR=2040,PSEQ=0;
+const PCH=(x,k)=>(x>0?"+":"")+x.toFixed(k==="add"?1:0)+(k==="add"?" °C":"%");
+async function loadClim(pi,vid){
+  const box=$("climproj");if(!box)return;
+  const pid=(CFG.projection_for||{})[vid];if(!pid)return;
+  const seq=++PSEQ,year=Math.min(2050,Math.max(2026,PYEAR)),p=RES.places[pi],d=p.vars[vid],v=RES.vars.find(x=>x.id===vid);
+  $("climout").innerHTML='<p class="muted" role="status">Asking the climate models…</p>';
+  let P=null;
+  try{P=await api("/api/projection",{lat:p.lat,lon:p.lon,year,domain:DOMAIN,vid})}catch(e){if(seq===PSEQ)$("climout").innerHTML=`<div class="muted">No projection: ${esc(e.message)}</div>`;return}
+  if(seq!==PSEQ)return;
+  const it=P.items[0];if(!it){$("climout").innerHTML='<div class="muted">No projection.</div>';return}
+  const vals=(d.values||[]).filter(x=>x!==null&&x!==undefined).slice(-(modeNow()==="month"?60:5));
+  const now=vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null,f=x=>now*(1+x/100),u=v.unit?" "+v.unit:"";
+  const same=it.rows.filter(r=>(r.change>0)===(it.mean>0)).length;
+  let h=`<p style="margin:6px 0"><span class="badge ${it.mean>0?"up":"down"} big">${PCH(it.mean,it.kind)}</span> by ${year} (average of ${it.window[0]} to ${it.window[1]}) from the models, range ${PCH(it.low,it.kind)} to ${PCH(it.high,it.kind)}. ${same} of ${it.n} models say ${it.mean>0?"rising":"falling"}.${it.few?` <span class="badge warn">Only ${it.n} of ${it.n_asked} models have this variable. Treat with care.</span>`:""}</p>`;
+  if(now!==null&&it.kind==="percent")h+=`<p style="margin:6px 0"><b>Carried forward from your data:</b> now about ${now.toFixed(3)}${esc(u)}. By ${year} the models put it near <b>${f(it.mean).toFixed(3)}${esc(u)}</b> (between ${f(Math.min(it.low,it.high)).toFixed(3)} and ${f(Math.max(it.low,it.high)).toFixed(3)}).</p>`;
+  if(P.note_layer)h+=`<div class="note">${esc(P.note_layer)}</div>`;
+  h+=`<details><summary style="font-size:14px">Each model (${it.n})</summary><div class="scroll"><table><thead><tr><th>Model</th><th>Change by ${year}</th></tr></thead><tbody>${it.rows.map(r=>`<tr><td>${esc(r.model.replace(/_/g," "))}</td><td>${PCH(r.change,it.kind)}</td></tr>`).join("")}</tbody></table></div></details><p class="muted" style="font-size:13px;margin:4px 0 0">${esc(P.note)} Each model is compared with its own 1991 to 2020 average. Source: Open-Meteo Climate API (CMIP6 high-resolution models).</p>`;
+  $("climout").innerHTML=h;
+}
+function climHtml(vid){
+  const has=(CFG.projection_for||{})[vid];
+  if(!has)return `<div class="note" style="margin-top:12px">Climate models: the Open-Meteo climate models do not give this variable, so only the straight-line outlook above applies.</div>`;
+  return `<div id="climproj" class="noprint" style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px"><h3 style="margin:0 0 6px">Climate model projection (7 models)</h3>
+   <label for="pyear" style="font-weight:500">Choose the year (2026 to 2050)</label>
+   <div class="row" style="align-items:center"><input type="number" id="pyear" min="2026" max="2050" value="${PYEAR}" style="max-width:130px"><button class="alt small" id="pgo" type="button">Show</button></div>
+   <div id="climout"></div></div>`;
+}
 let DOMAIN="coast",CFG=null,places=[],selected=new Set(),RES=null,LASTBODY=null,map=null,markers=[];
 function fmt(v,nd=2){if(v==null||!isFinite(v))return "–";const a=Math.abs(v);return (a!==0&&a<Math.pow(10,-nd))?v.toFixed(nd+2):v.toFixed(nd)}
 function pf(p){return p<0.001?"< 0.001":p.toFixed(3)}
@@ -158,59 +204,9 @@ function sgn(v,nd=2){return (v>0?"+":"")+fmt(v,nd)}
 
 async function api(path,body){const r=await fetch(path,{method:body?"POST":"GET",headers:{"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});const j=await r.json().catch(()=>({error:"Bad answer from the app."}));if(!r.ok)throw new Error(j.error||"Something went wrong.");return j}
 
-
-let gmap=null;
-const wrapLng=x=>((x+540)%360)-180;
-function drawMarkers(){
-  markers.forEach(m=>m.remove());markers=[];
-  if(gmap&&GM3){markers=places.map(p=>{const m=new GM3.Marker3DElement({position:{lat:p.lat,lng:p.lon,altitude:0},altitudeMode:"CLAMP_TO_GROUND",label:p.name.slice(0,24)});gmap.append(m);return m})}
-  else if(map){markers=places.map(p=>new maplibregl.Marker({color:"#0b6e8a"}).setLngLat([p.lon,p.lat]).addTo(map))}
-}
-function flyTo(lat,lon){
-  if(gmap){try{gmap.flyCameraTo({endCamera:{center:{lat,lng:lon,altitude:0},range:900000,tilt:0,heading:0},durationMillis:2500})}catch(e){}}
-  else if(map)map.flyTo({center:[lon,lat],zoom:5,duration:1800});
-}
-function resizeMap(){if(map&&!gmap)map.resize()}
-let GM3=null;
-function startMapLibre(){
-  const box=$("map");box.querySelectorAll("gmp-map-3d").forEach(e=>e.remove());gmap=null;GM3=null;
-  map=new maplibregl.Map({container:"map",center:[30,22],zoom:1.4,maxZoom:12,attributionControl:{compact:true},
-    style:{version:8,projection:{type:"globe"},
-      sources:{osm:{type:"raster",tiles:["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],tileSize:256,maxzoom:12,attribution:"© OpenStreetMap contributors"}},
-      layers:[{id:"sea",type:"background",paint:{"background-color":"#a9cfe0"}},{id:"osm",type:"raster",source:"osm"}],
-      sky:{"atmosphere-blend":["interpolate",["linear"],["zoom"],0,1,5,1,7,0]}}});
-  map.addControl(new maplibregl.NavigationControl({visualizePitch:true}),"top-right");
-  map.addControl(new maplibregl.GlobeControl(),"top-right");
-  map.on("click",e=>addPlace(e.lngLat.lat,wrapLng(e.lngLat.lng)));
-  drawMarkers();
-}
-function loadGoogle(key){
-  return new Promise((res,rej)=>{
-    const t=setTimeout(()=>rej(new Error("Google Maps took too long")),12000);
-    window.gm_authFailure=()=>{clearTimeout(t);rej(new Error("Google refused the key"))};
-    window.__gmReady=()=>{clearTimeout(t);res()};
-    const s=document.createElement("script");s.async=true;s.onerror=()=>{clearTimeout(t);rej(new Error("Google Maps could not load"))};
-    s.src="https://maps.googleapis.com/maps/api/js?key="+encodeURIComponent(key)+"&v=beta&loading=async&callback=__gmReady";
-    document.head.append(s)})
-}
-async function initGlobe(){
-  if(CFG.google_key){
-    try{
-      await loadGoogle(CFG.google_key);
-      GM3=await google.maps.importLibrary("maps3d");
-      const m=new GM3.Map3DElement({mode:"HYBRID",center:{lat:22,lng:30,altitude:0},range:18000000,tilt:0,heading:0});
-      m.style.cssText="width:100%;height:100%;display:block";
-      m.addEventListener("gmp-error",()=>{if(gmap===m)startMapLibre()});
-      m.addEventListener("gmp-click",e=>{const p=e.position;if(p)addPlace(p.lat,wrapLng(p.lng))});
-      $("map").prepend(m);gmap=m;window.gm_authFailure=()=>{if(gmap===m)startMapLibre()};
-      $("globesrc").textContent="Google 3D globe";return;
-    }catch(e){console.warn("Google globe not used:",e.message);GM3=null;gmap=null}
-  }
-  startMapLibre();$("globesrc").textContent=CFG.google_key?"Google globe could not load, showing the open globe":"Open globe (add a Google Maps key to use the Google 3D globe)";
-}
 function renderChips(){
   $("chips").innerHTML=places.map((p,i)=>`<span class="chip">${esc(p.name)}<button data-rm="${i}" aria-label="Remove ${esc(p.name)}">×</button></span>`).join("")||'<span class="muted">No places yet.</span>';
-  drawMarkers();
+  if(map&&GM3){markers.forEach(m=>m.remove());markers=places.map(p=>{const m=new GM3.Marker3DElement({position:{lat:p.lat,lng:p.lon,altitude:0},altitudeMode:"CLAMP_TO_GROUND",label:p.name.slice(0,24)});map.append(m);return m})}
 
 }
 function addPlace(lat,lon,name){
@@ -225,7 +221,7 @@ async function search(){
   const q=$("q").value.trim();if(!q)return;$("hits").innerHTML='<span class="muted">Searching…</span>';
   try{const r=await fetch("https://geocoding-api.open-meteo.com/v1/search?count=5&language=en&name="+encodeURIComponent(q));const j=await r.json();
     const list=j.results||[];$("hits").innerHTML=list.length?list.map((h,i)=>`<button data-h="${i}">${esc(h.name)}${h.admin1?", "+esc(h.admin1):""}, ${esc(h.country||"")}</button>`).join(""):'<span class="muted">Nothing found. Try another spelling.</span>';
-    $("hits").onclick=e=>{const b=e.target.closest("[data-h]");if(!b)return;const h=list[+b.dataset.h];addPlace(h.latitude,h.longitude,h.name+(h.country_code?" ("+h.country_code+")":""));flyTo(h.latitude,h.longitude);$("hits").innerHTML=""}}
+    $("hits").onclick=e=>{const b=e.target.closest("[data-h]");if(!b)return;const h=list[+b.dataset.h];addPlace(h.latitude,h.longitude,h.name+(h.country_code?" ("+h.country_code+")":""));if(map)try{map.flyCameraTo({endCamera:{center:{lat:h.latitude,lng:h.longitude,altitude:0},range:900000,tilt:0,heading:0},durationMillis:2500})}catch(e){};$("hits").innerHTML=""}}
   catch(e){$("hits").innerHTML='<span class="muted">Search needs the internet. You can type coordinates instead.</span>'}
 }
 $("qgo").onclick=search;$("q").onkeydown=e=>{if(e.key==="Enter")search()};
@@ -249,7 +245,6 @@ $("run").onclick=async()=>{
   catch(e){$("status").innerHTML='<div class="err">'+esc(e.message)+"</div>"}
   $("run").disabled=false;
 };
-
 
 function cellHtml(t,err){
   if(!t)return '<span class="muted">No data</span>'+(err?`<div class="muted" style="font-size:12px">${esc(err)}</div>`:"");
@@ -317,7 +312,7 @@ function detail(pi,vid,scroll){
   if(!t){el.innerHTML=`<h2>${esc(v.name)} · ${esc(p.name)}</h2><p class="muted">No data.</p>`;return}
   const col=!t.significant?"flat":t.direction==="rising"?"up":"down";
   const rows=(a)=>a.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("");
-  el.innerHTML=`<div class="row" style="align-items:center;justify-content:space-between"><div><h2 style="margin:0">${esc(v.name)} · ${esc(p.name)}</h2><div class="muted">${esc(v.source)}</div>${p.vars[vid]&&p.vars[vid].note?`<div class="muted" style="color:var(--bad,#b3261e);font-weight:600">${esc(p.vars[vid].note)}</div>`:""}</div>
+  el.innerHTML=`<div class="row" style="align-items:center;justify-content:space-between"><div><h2 style="margin:0">${esc(v.name)} · ${esc(p.name)}</h2><div class="muted">${esc(v.source)}</div></div>
    <div><span class="badge ${t.significant?"yes":"no"} big">${t.verdict}</span> <span class="badge ${col} big">${t.direction}</span></div></div>
    <p style="font-size:17px;margin:10px 0">${esc(t.sentence)}</p>${t.warnings.map(w=>`<div class="note">${esc(w)}</div>`).join("")}
    ${chart(d,v)}
@@ -336,10 +331,11 @@ function detail(pi,vid,scroll){
       ["95% CI of Theil-Sen slope",`${sgn(t.sen.ci_low)} to ${sgn(t.sen.ci_high)} per ${t.rate_label} → ${t.sen.significant?"excludes zero":"includes zero"}`],
       ["Methods agree?",t.agree?"Yes":'<span class="badge warn">No: borderline</span>'],
       ["Year-to-year similarity",fmt(t.lag1)]])}</table></div></div>
-   ${outlookHtml(d,v)}
+   ${outlookHtml(d,v)}${climHtml(vid)}
    <details style="margin-top:12px"><summary>Show the values</summary><div class="scroll"><table><thead><tr><th>Period</th><th>${esc(v.name)} (${esc(v.unit)})</th></tr></thead><tbody>${d.labels.map((y,i)=>`<tr><td>${esc(y)}</td><td>${d.values[i]==null?"–":fmt(d.values[i],3)}</td></tr>`).join("")}</tbody></table></div></details>
    <div id="causes" class="noprint" style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px"></div>`;
   causeStart(pi,vid);calStart(pi);
+  if($("pgo")){const go=()=>{const y=parseInt($("pyear").value,10);PYEAR=isNaN(y)?2040:Math.min(2050,Math.max(2026,y));$("pyear").value=PYEAR;loadClim(pi,vid)};$("pgo").onclick=go;$("pyear").onchange=go;loadClim(pi,vid)}
   if(scroll)el.scrollIntoView({behavior:"smooth",block:"start"});
 }
 
@@ -472,7 +468,6 @@ function setDomain(d){
   $("sub").textContent=d==="soil"?"Soil section: find where the soil is slowly drying.":"Coastal area section: check sea and coast trends and assess risk.";
   $("q").placeholder=d==="soil"?"Dubai, Nairobi, Oslo…":"Dubai, Mombasa, Miami…";
   $("regnote").textContent=d==="soil"?"Regional data (about 50 km), not one field.":"Regional data (about 25 to 50 km), not one beach.";
-  setTimeout(resizeMap,60);
 }
 async function start(){
   CFG=await api("/api/config");
@@ -481,8 +476,8 @@ async function start(){
   $("mchecks").innerHTML=MN.map((m,i)=>`<label><input type="checkbox" value="${i+1}" checked><span>${m.slice(0,3)}</span></label>`).join("");
   document.querySelectorAll("[data-season]").forEach(b=>b.onclick=()=>{const set=new Set(b.dataset.season.split(",").map(Number));document.querySelectorAll("#mchecks input").forEach(c=>c.checked=set.has(+c.value))});
   $("y0").value=CFG.first_year;$("y1").value=CFG.last_year;$("y0").min=CFG.first_year;$("y1").max=CFG.max_year;
-  try{await initGlobe()}
-  catch(e){map=null;gmap=null;$("maperr").hidden=false}
+  try{await initGoogleGlobe()}
+  catch(e){map=null;$("maperr").textContent=(CFG.google_key?"The Google 3D globe could not load ("+e.message+"). ":"No Google Maps key is set (add GOOGLE_MAPS_API_KEY). ")+"Use the search box or type coordinates.";$("maperr").hidden=false}
   const iso=d=>d.toISOString().slice(0,10),end=new Date(Date.now()-6*864e5),beg=new Date(end.getTime()-59*864e5);$("d0").value=iso(beg);$("d1").value=iso(end);$("d1").max=iso(end);
   const tog=()=>{const dm=modeNow()==="day";$("daybox").hidden=!dm;$("monthbox").hidden=dm};document.querySelectorAll("input[name=mode]").forEach(x=>x.onchange=tog);tog();
   renderChips();

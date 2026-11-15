@@ -1,11 +1,11 @@
 CASTD: Coastal Area and Soil Trend Detection (NASA Space Apps Challenge, Earth science trends)
 
-Run: install Python (tick "Add to PATH"), double-click run.bat. Opens http://127.0.0.1:9029
-This release uses port 9029 (every release uses a new port).
+Run: install Python (tick "Add to PATH"), double-click run.bat. Opens http://127.0.0.1:9032
+This release uses port 9032 (every release uses a new port).
 
 Two separate sections. The start screen asks which one you want:
   1. Coastal section: "Do you want to check a coastal area and assess its risk?"
-     Main sea measures you can choose: sea surface temperature (NOAA satellite), wind, sea level, wave height, wave period.
+     Main sea measures you can choose: sea surface temperature, wind, sea level, wave height, wave period.
      Everything else (air temperature, carbon dioxide, rain, clouds, El Nino and more) is a possible cause, with its own trend direction and trend line.
      You get alerts, a long-term outlook, a sea calendar with a swimming rating, a verdict and precaution policy.
   2. Soil section: "Do you want to find which areas of soil are slowly drying out?"
@@ -30,38 +30,14 @@ Limits
   The outlook is a straight line from the measured trend, not a forecast.
   Causes are association (evidence), not proof.
 
-Extra data from Meteomatics (optional, off unless you set two secret settings)
-  What it adds: only measures the app does not already have, so nothing is fetched twice:
-  soil moisture deficit (how much water the soil is short of, in mm) and swell height. Soil wetness stays NASA POWER; wave height and period stay Open-Meteo. They appear in the measure list under "Extra ... (Meteomatics)".
-  Your Meteomatics user name and password are NEVER saved in any file. The app reads them only from two environment variables:
-      METEOMATICS_USER     METEOMATICS_PASS
-  If they are not set, these rows do not appear and everything else works as before.
-  On your own computer: open run.bat in Notepad and remove "rem" from the two "set" lines, then type your user name and password there.
-     Do not share or upload run.bat after you type the password into it.
-  On Render: your service > Environment > Add Environment Variable, one for each name above. Then Save (Render restarts the service).
-  Each place and each Meteomatics measure uses about 11 requests (three years per request) for 1990 to now. Your plan has a request limit, so pick few measures.
-  NOT TESTED LIVE: the web address form, the answer layout, and how far back your account can read were written from documentation.
-  They were tested only on simulated answers. Run check_sources.bat after setting the two variables. A wrong login, no rights to a
-  parameter, or a request limit shows as "No data" with the reason on that row; nothing else breaks.
+Google 3D globe (needs a Google Maps key)
+  The map is Google's 3D globe (Maps JavaScript API, "Map 3D"). It needs the setting GOOGLE_MAPS_API_KEY. The key is read only from that setting and is not saved in any file.
+  Without it, or if Google refuses it, the map area shows a message and you can still add places with the search box or by typing coordinates.
+  The key must allow your website address (Google Cloud > Credentials > the key > Website restrictions, for example https://castdx.onrender.com/*).
+  NOT TESTED WITH GOOGLE: it was tested with a stand-in for Google's library, not with Google itself.
 
-Sources used for the coastal section (one source for each measure, chosen on meaning, trust and reach)
-  Sea surface temperature   NOAA OISST satellite data (0.25 degree, daily, from 1982). Real observed sea temperature, any sea or ocean point.
-                            The NASA POWER "skin temperature" is only a model value and can be land temperature near a shore, so it is not offered
-                            as the measure. If NOAA does not answer, the row uses the NASA value and says so on that row.
-  Wind speed at 10 m        NASA POWER (MERRA-2 model). Same meaning everywhere on Earth, 1981 to now. Nothing better is free for every point.
-  Sea level                 PSMSL tide gauge (nearest gauge, within 250 km). Real measured sea level but only near a gauge. Far from one, the row says "No data".
-  Wave height, wave period  Open-Meteo Marine (ECMWF and Meteo-France wave models). The only free wave source for any sea point. NASA POWER has no waves.
-  NOT TESTED LIVE: NOAA, PSMSL and Open-Meteo were written from documentation and tested on simulated answers. Run check_sources.bat.
-
-3D globe
-  The map is a 3D globe (open MapLibre globe by default; Google 3D globe when you add a key, see below). Drag to turn it, scroll to zoom, click to add a place. The globe button (top right) flips it to a flat map.
-  Map pictures come from OpenStreetMap, so it needs the internet.
-
-Google 3D globe (needs your own Google Maps key)
-  The app shows the Google 3D globe (Maps JavaScript API, "Map 3D") when the setting GOOGLE_MAPS_API_KEY is present. Without it, or if Google
-  cannot load or refuses the key, the app shows the open 3D globe (MapLibre) so the map always works. A line above the globe says which one you see.
-  How to get a key: Google Cloud Console > create a project > turn on billing (Google requires it for Maps) > APIs and Services > enable
-  "Maps JavaScript API" > Credentials > Create API key. Then restrict the key to your website address (HTTP referrers, for example
-  https://castdx.onrender.com/*) and to the Maps JavaScript API. A browser key is visible to visitors, so the restriction is what protects it.
-  On Render: Environment > add GOOGLE_MAPS_API_KEY. On your own computer: remove "rem" from the GOOGLE line in run.bat.
-  NOT TESTED WITH GOOGLE: it was tested with a stand-in for Google's library (click, markers, fly-to, fallback), not with Google itself.
+Climate model projection (inside the long-term outlook)
+  Open a result row. Under "Long-term outlook" the section "Climate model projection (7 models)" has a year box (2026 to 2050) and shows the change by that year
+  from up to 7 climate models (Open-Meteo Climate API), plus your own latest data carried forward by that change. Available for wind and soil wetness only.
+  Soil water exists in only 2 of the 7 models (the page says so). The models have no sea temperature, sea level or waves.
+  These are projections, not forecasts. The models end in 2050. NOT TESTED LIVE: tested on simulated answers only.

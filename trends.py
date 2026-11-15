@@ -36,32 +36,19 @@ import ocean  # noqa: E402
 
 for _i, _g in ocean.OC.items():
     VARIABLES.append((_i, _g[0], _g[1], ocean.GROUP, _g[4], _g[2]))
-import meteomatics  # noqa: E402
-
-for _i, _g in meteomatics.MM.items():
-    VARIABLES.append((_i, _g[0], _g[1], meteomatics.GROUP[_g[5]], meteomatics.SOURCE, _g[2]))
 BY_ID = {v[0]: dict(zip(("id", "name", "unit", "group", "source", "percent_ok"), v)) for v in VARIABLES}
 for _i, _g in ocean.OC.items():
-    BY_ID[_i]["first_year"] = _g[3]
-for _i, _g in meteomatics.MM.items():
     BY_ID[_i]["first_year"] = _g[3]
 # near-duplicates kept for the cause search but not offered as measures
 # only the main sea characteristics are offered as measures; everything else is used as a possible cause
 SOIL_SELECTABLE = ["GWETTOP", "GWETROOT", "GWETPROF"]
-COAST_SELECTABLE = ["SST_OI", "WS10M", "SEALEVEL", "WAVE", "WAVEP"]
+COAST_SELECTABLE = ["TS", "WS10M", "SEALEVEL", "WAVE", "WAVEP"]
 SELECTABLE = COAST_SELECTABLE + SOIL_SELECTABLE
-
-
-def selectable() -> list:
-    """The measures offered in the picker. The Meteomatics ones appear only when the two secret settings exist."""
-    return SELECTABLE + (meteomatics.MM_IDS if meteomatics.enabled() else [])
-
-
-DEFAULTS = {"coast": ["SST_OI", "WS10M"], "soil": ["GWETTOP", "GWETROOT", "GWETPROF"]}
+DEFAULTS = {"coast": ["TS", "WS10M"], "soil": ["GWETTOP", "GWETROOT", "GWETPROF"]}
 for _i in BY_ID:
-    BY_ID[_i]["domain"] = "soil" if (_i in SOIL_SELECTABLE or _i in meteomatics.SOIL_IDS) else "coast"
-DEFAULT_SELECTION = ["SST_OI", "WS10M"]
-OCEAN_SELECTION = ["SST_OI", "WS10M", "SEALEVEL", "WAVE", "WAVEP"]
+    BY_ID[_i]["domain"] = "soil" if _i in SOIL_SELECTABLE else "coast"
+DEFAULT_SELECTION = ["TS", "WS10M"]
+OCEAN_SELECTION = ["TS", "WS10M", "SEALEVEL", "WAVE", "WAVEP"]
 
 
 class DataError(Exception):
@@ -102,40 +89,16 @@ def cell_of(lat: float, lon: float) -> tuple:
 def fetch_cell(cell: tuple, params: list, y0: int, y1: int, getter) -> dict:
     """Series for each parameter. Ocean extra ids go to NOAA, PSMSL or Open-Meteo (ocean.py), the rest to NASA POWER.
     The answer also holds "_errors": {id: text} for series that could not be downloaded."""
-    m_ids = [p for p in params if p in meteomatics.MM]
-    params = [p for p in params if p not in meteomatics.MM]
     g_ids = [p for p in params if p in ocean.OC]
     p_ids = [p for p in params if p not in ocean.OC]
     out: dict = {}
-    if m_ids:
-        ms, merrs = meteomatics.fetch_point(cell, m_ids, y0, y1)
-        out.update(ms)
-        if merrs:
-            out["_errors"] = dict(merrs)
-            if not g_ids and not p_ids and not any(ms.values()):
-                raise DataError("Meteomatics: " + "; ".join(sorted(set(merrs.values()))))
     if g_ids:
         gs, errs = ocean.fetch_point(cell, g_ids, y0, y1)
         out.update(gs)
         if errs:
-            out.setdefault("_errors", {}).update(errs)
-            if not p_ids and not any(gs.values()) and "SST_OI" not in g_ids:
+            out["_errors"] = errs
+            if not p_ids and not any(gs.values()):
                 raise DataError("Sea data: " + "; ".join(sorted(set(errs.values()))))
-    # Sea temperature: NOAA satellite data is the source. If NOAA does not answer, the NASA model temperature takes its place
-    # and the row says so, so the sea section never shows an empty temperature row because of one server being down.
-    if "SST_OI" in g_ids and not out.get("SST_OI") and "TS" not in p_ids:
-        why = (out.get("_errors") or {}).pop("SST_OI", "no answer")
-        try:
-            ts = _fetch_power(cell, ["TS"], y0, y1, getter).get("TS") or {}
-        except Exception:       # noqa: BLE001
-            ts = {}
-        if ts:
-            out["SST_OI"] = ts
-            out["_notes"] = {"SST_OI": "NOAA satellite data did not answer (" + str(why)[:80] + "), so this row uses the NASA model skin temperature instead."}
-            if not out.get("_errors"):
-                out.pop("_errors", None)
-        else:
-            out.setdefault("_errors", {})["SST_OI"] = why
     if p_ids:
         out.update(_fetch_power(cell, p_ids, y0, y1, getter))
     return out
@@ -293,9 +256,6 @@ def run(places: list, var_ids: list, y0: int, m0: int, y1: int, m1: int, months:
             tr = stats.analyse(ser["x"], ser["values"], info["name"], info["unit"], info["percent_ok"], seasons=ser["seasons"] if mode == "month" else None,
                                min_n=stats.min_points(mode))
             res[v] = {"x": ser["x"], "values": ser["values"], "labels": ser["labels"], "trend": tr}
-            nt = ((data.get(c) or {}).get("_notes") or {}).get(v)
-            if nt:
-                res[v]["note"] = nt
             why = ((data.get(c) or {}).get("_errors") or {}).get(v)
             if why:
                 res[v]["error"] = why
@@ -306,7 +266,7 @@ def run(places: list, var_ids: list, y0: int, m0: int, y1: int, m1: int, months:
 
 def run_daily(places: list, var_ids: list, d0, d1, getter) -> dict:
     """Exact dates, one value per day. Strong day-to-day similarity is corrected for in the p-values."""
-    var_ids = [v for v in var_ids if v not in ocean.OC and v not in meteomatics.MM]
+    var_ids = [v for v in var_ids if v not in ocean.OC]
     if not var_ids:
         raise ValueError("Choose at least one variable.")
     if not places:

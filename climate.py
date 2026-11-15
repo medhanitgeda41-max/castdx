@@ -8,12 +8,13 @@ with each model's own 1991 to 2020 mean. The change is then also put on top of t
 
 Written from the Open-Meteo documentation and tested only on simulated answers (the workspace could not reach the service).
 Known from the documentation: soil moisture exists in only 2 of the 7 models, some models lack some wind or humidity fields,
-and the free service has a daily limit, so answers are cached on disk.
+and the free service has a daily limit, so answers are cached on disk. The requests run side by side to keep the wait short.
 """
 from __future__ import annotations
 
 import json
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 URL = "https://climate-api.open-meteo.com/v1/climate"
@@ -23,16 +24,22 @@ BASE_Y0, BASE_Y1 = 1991, 2020
 LAST_YEAR = 2050
 HALF = 5                                    # the target is the mean of the years year-5 to year+5
 
-# id: (plain name, unit shown, API name, factor to the shown unit, how the change is shown, which sections)
+# id: (plain name, unit shown, API name, factor to the shown unit, how the change is shown)
 VARS = {
-    "wind": ("Wind speed at 10 m", "m/s", "wind_speed_10m_mean", 1 / 3.6, "percent", ("coast", "soil")),
-    "temp": ("Air temperature", "°C", "temperature_2m_mean", 1.0, "add", ("coast", "soil")),
-    "rain": ("Rain", "mm/day", "precipitation_sum", 1.0, "percent", ("coast", "soil")),
-    "soil": ("Surface soil water (0 to 10 cm)", "m³/m³", "soil_moisture_0_to_10cm_mean", 1.0, "percent", ("soil",)),
+    "wind": ("Wind speed at 10 m", "m/s", "wind_speed_10m_mean", 1 / 3.6, "percent"),
+    "temp": ("Air temperature", "°C", "temperature_2m_mean", 1.0, "add"),
+    "rain": ("Rain", "mm/day", "precipitation_sum", 1.0, "percent"),
+    "soil": ("Surface soil water (0 to 10 cm)", "m³/m³", "soil_moisture_0_to_10cm_mean", 1.0, "percent"),
 }
 ORDER = {"coast": ["wind", "temp", "rain"], "soil": ["soil", "rain", "temp", "wind"]}
 # the person's own measure that each projection can be put on top of: measure id -> projection id
-APPLY = {"WS10M": "wind", "GWETTOP": "soil"}
+APPLY = {"WS10M": "wind", "GWETTOP": "soil", "GWETROOT": "soil", "GWETPROF": "soil"}
+LAYER_NOTE = {"GWETROOT": "The models give only the top 10 cm of soil. Their change is applied here to the root zone as a rough guide.",
+              "GWETPROF": "The models give only the top 10 cm of soil. Their change is applied here to the whole soil depth as a rough guide."}
+
+
+class ClimateError(Exception):
+    pass
 
 
 def window(year: int) -> tuple:
@@ -43,10 +50,6 @@ def window(year: int) -> tuple:
     if a <= BASE_Y1:
         a, b = BASE_Y1 + 1, BASE_Y1 + 1 + 2 * HALF
     return a, b
-
-
-class ClimateError(Exception):
-    pass
 
 
 def http_get(url: str, params: dict, timeout: int = 120):
@@ -77,8 +80,6 @@ def _yearly(js: dict, api_name: str, factor: float) -> dict:
     out = {}
     for m in MODELS:
         vals = d.get(f"{api_name}_{m}")
-        if vals is None and len(MODELS) == 1:
-            vals = d.get(api_name)
         if not vals:
             continue
         acc: dict = {}
@@ -93,7 +94,7 @@ def _yearly(js: dict, api_name: str, factor: float) -> dict:
 
 
 def _ask(lat: float, lon: float, vid: str, a: int, b: int, get) -> dict:
-    name, _u, api, factor = VARS[vid][0], VARS[vid][1], VARS[vid][2], VARS[vid][3]
+    name, api, factor = VARS[vid][0], VARS[vid][2], VARS[vid][3]
     r = get(URL, {"latitude": lat, "longitude": lon, "start_date": f"{a}-01-01", "end_date": f"{b}-12-31",
                   "models": ",".join(MODELS), "daily": api, "timezone": "GMT"})
     try:
@@ -115,8 +116,7 @@ def yearly(lat: float, lon: float, vid: str, year: int, get=None) -> dict:
     w0, w1 = window(year)
     path = CACHE_DIR / f"clim_{lat}_{lon}_{vid}_{w0}_{w1}.json"
     try:
-        have = {m: {int(y): v for y, v in d.items()} for m, d in json.loads(path.read_text(encoding="utf-8")).items()}
-        return have
+        return {m: {int(y): v for y, v in d.items()} for m, d in json.loads(path.read_text(encoding="utf-8")).items()}
     except (OSError, ValueError):
         pass
     base = _ask(lat, lon, vid, BASE_Y0, BASE_Y1, get)
@@ -136,7 +136,7 @@ def _mean(xs):
 
 
 def project_one(lat: float, lon: float, vid: str, year: int, get=None) -> dict:
-    name, unit, _api, _f, kind = VARS[vid][:5]
+    name, unit, _api, _f, kind = VARS[vid]
     ys = yearly(lat, lon, vid, year, get)
     w0, w1 = window(year)
     rows = []
@@ -157,21 +157,25 @@ def project_one(lat: float, lon: float, vid: str, year: int, get=None) -> dict:
     chs = [r["change"] for r in rows]
     return {"id": vid, "name": name, "unit": unit, "kind": kind, "year": year, "window": [w0, w1], "base_years": [BASE_Y0, BASE_Y1],
             "rows": rows, "n": len(rows), "n_asked": len(MODELS), "mean": sum(chs) / len(chs), "low": min(chs), "high": max(chs),
-            "agree": sum(1 for c in chs if c > 0) if len(chs) else 0,
             "few": len(rows) < 5}
 
 
-def project(lat: float, lon: float, year: int, domain: str, get=None) -> dict:
+def project(lat: float, lon: float, year: int, domain: str, get=None, vid: str = "") -> dict:
     year = int(year)
     if year < BASE_Y1 + 1 or year > LAST_YEAR:
         raise ValueError(f"Choose a year from {BASE_Y1 + 6} to {LAST_YEAR}. These models end in {LAST_YEAR}.")
-    out, errs = [], {}
-    for vid in ORDER["soil" if domain == "soil" else "coast"]:
+    ids = [APPLY[vid]] if vid in APPLY else ORDER["soil" if domain == "soil" else "coast"]
+    out, errs = {}, {}
+
+    def one(vid):
         try:
-            out.append(project_one(lat, lon, vid, year, get))
+            out[vid] = project_one(lat, lon, vid, year, get)
         except Exception as e:      # noqa: BLE001
             errs[vid] = str(e)[:160]
-    if not out:
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        list(ex.map(one, ids))
+    items = [out[i] for i in ids if i in out]
+    if not items:
         raise ClimateError("; ".join(sorted(set(errs.values()))) or "no answer")
-    return {"year": year, "items": out, "errors": errs, "models": MODELS, "apply": APPLY,
+    return {"year": year, "items": items, "errors": errs, "models": MODELS, "apply": APPLY, "note_layer": LAYER_NOTE.get(vid, ""),
             "note": "Model projections, not forecasts. Each model is one possible future under the same assumed emissions. The spread between models shows how unsure the answer is."}
