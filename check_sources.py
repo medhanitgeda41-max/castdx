@@ -4,7 +4,6 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import climate  # noqa: E402
 import meteomatics  # noqa: E402
 import ocean       # noqa: E402
 import trends      # noqa: E402
@@ -38,12 +37,6 @@ def main():
             print("     note: " + n)
     except Exception as e:      # noqa: BLE001
         line(False, "Extra sea data", str(e))
-    try:
-        P = climate.project(LAT, LON, 2040, "coast")
-        for it in P["items"]:
-            line(it["n"] >= 5, "Climate projection " + it["name"], f"{it['n']} of {it['n_asked']} models, change by 2040 {it['mean']:+.2f}")
-    except Exception as e:      # noqa: BLE001
-        line(False, "Climate projection (Open-Meteo)", str(e))
     if meteomatics.enabled():
         try:
             got, errs = meteomatics.fetch_point((LAT, LON), meteomatics.SEA_IDS, 2019, 2020)

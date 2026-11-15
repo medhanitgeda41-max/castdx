@@ -6,3 +6,4 @@ Hugging Face Spaces: New Space > Docker > upload these files (the Dockerfile is 
 5. Optional Meteomatics extra data: on Render open your service > Environment > Add Environment Variable.
    Name METEOMATICS_USER, value = your user name.  Name METEOMATICS_PASS, value = your password. Save.
    Never type these into a file in GitHub. Without them the extra rows simply do not show.
+6. Optional Google 3D globe: add one more Environment Variable, GOOGLE_MAPS_API_KEY = your Google Maps key (restricted to your website). Without it the open 3D globe is used.

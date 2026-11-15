@@ -1,7 +1,7 @@
 CASTD: Coastal Area and Soil Trend Detection (NASA Space Apps Challenge, Earth science trends)
 
-Run: install Python (tick "Add to PATH"), double-click run.bat. Opens http://127.0.0.1:9027
-This release uses port 9027 (every release uses a new port).
+Run: install Python (tick "Add to PATH"), double-click run.bat. Opens http://127.0.0.1:9029
+This release uses port 9029 (every release uses a new port).
 
 Two separate sections. The start screen asks which one you want:
   1. Coastal section: "Do you want to check a coastal area and assess its risk?"
@@ -53,14 +53,15 @@ Sources used for the coastal section (one source for each measure, chosen on mea
   Wave height, wave period  Open-Meteo Marine (ECMWF and Meteo-France wave models). The only free wave source for any sea point. NASA POWER has no waves.
   NOT TESTED LIVE: NOAA, PSMSL and Open-Meteo were written from documentation and tested on simulated answers. Run check_sources.bat.
 
-Climate model projection (new)
-  Pick a future year (2026 to 2050) in step 2. At the END of the results a card shows, for each place, the change by that year from up to 7
-  climate models (Open-Meteo Climate API: CMCC_CM2_VHR4, FGOALS_f3_H, HiRAM_SIT_HR, MRI_AGCM3_2_S, EC_Earth3P_HR, MPI_ESM1_2_XR, NICAM16_8S).
-  Variables: wind, air temperature, rain, and surface soil water. Each model's change is measured against its own 1991 to 2020 mean, and the
-  change is carried forward on top of your own latest data for wind and surface soil wetness.
-  Limits: soil water exists in only 2 of the 7 models (the card says so). The models have no sea temperature, sea level or waves, so those keep the
-  straight-line outlook. These are projections, not forecasts. The models end in 2050. NOT TESTED LIVE: tested on simulated answers only.
-
 3D globe
-  The map is now a 3D globe (MapLibre GL). Drag to turn it, scroll to zoom, click to add a place. The globe button (top right) flips it to a flat map.
+  The map is a 3D globe (open MapLibre globe by default; Google 3D globe when you add a key, see below). Drag to turn it, scroll to zoom, click to add a place. The globe button (top right) flips it to a flat map.
   Map pictures come from OpenStreetMap, so it needs the internet.
+
+Google 3D globe (needs your own Google Maps key)
+  The app shows the Google 3D globe (Maps JavaScript API, "Map 3D") when the setting GOOGLE_MAPS_API_KEY is present. Without it, or if Google
+  cannot load or refuses the key, the app shows the open 3D globe (MapLibre) so the map always works. A line above the globe says which one you see.
+  How to get a key: Google Cloud Console > create a project > turn on billing (Google requires it for Maps) > APIs and Services > enable
+  "Maps JavaScript API" > Credentials > Create API key. Then restrict the key to your website address (HTTP referrers, for example
+  https://castdx.onrender.com/*) and to the Maps JavaScript API. A browser key is visible to visitors, so the restriction is what protects it.
+  On Render: Environment > add GOOGLE_MAPS_API_KEY. On your own computer: remove "rem" from the GOOGLE line in run.bat.
+  NOT TESTED WITH GOOGLE: it was tested with a stand-in for Google's library (click, markers, fly-to, fallback), not with Google itself.
