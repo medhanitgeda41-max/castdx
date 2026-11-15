@@ -5,5 +5,5 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: python trend_app.py
     envVars:
-      - key: GOOGLE_MAPS_API_KEY
+      - key: AIzaSyCyEnEACI45aszKAUmkLFQTunhRD9Zgv98
         sync: false   # Render asks you for the value in its dashboard; it is never stored in this file
