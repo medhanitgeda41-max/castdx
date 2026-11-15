@@ -1,7 +1,7 @@
 CASTD: Coastal Area and Soil Trend Detection (NASA Space Apps Challenge, Earth science trends)
 
-Run: install Python (tick "Add to PATH"), double-click run.bat. Opens http://127.0.0.1:9033
-This release uses port 9033 (every release uses a new port).
+Run: install Python (tick "Add to PATH"), double-click run.bat. Opens http://127.0.0.1:9034
+This release uses port 9034 (every release uses a new port).
 
 Two separate sections. The start screen asks which one you want:
   1. Coastal section: "Do you want to check a coastal area and assess its risk?"
@@ -30,11 +30,10 @@ Limits
   The outlook is a straight line from the measured trend, not a forecast.
   Causes are association (evidence), not proof.
 
-Google 3D globe (needs a Google Maps key)
-  The map is Google's 3D globe (Maps JavaScript API, "Map 3D"). It needs the setting GOOGLE_MAPS_API_KEY. The key is read only from that setting and is not saved in any file.
-  Without it, or if Google refuses it, the map area shows a message and you can still add places with the search box or by typing coordinates.
-  The key must allow your website address (Google Cloud > Credentials > the key > Website restrictions, for example https://castdx.onrender.com/*).
-  NOT TESTED WITH GOOGLE: it was tested with a stand-in for Google's library, not with Google itself.
+3D globe map (OpenStreetMap)
+  The map is a 3D globe made with MapLibre GL (files in web/lib) and OpenStreetMap picture tiles. No key is needed.
+  If the globe cannot start (no 3D graphics in the browser, or files missing), a flat 2D map (Leaflet) is shown instead.
+  NOT TESTED WITH THE REAL TILE SERVER: the test computer cannot reach OpenStreetMap.
 
 Climate model projection (inside the long-term outlook)
   Open a result row. Under "Long-term outlook" the section "Climate model projection (7 models)" has a year box (2026 to 2050) and shows the change by that year
