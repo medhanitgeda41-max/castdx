@@ -66,6 +66,10 @@ body[data-sec=coast]{--page:#0a1828;--bg:#09131f;--card:#11253a;--line:#1f4263;-
 body[data-sec=soil]{--page:#14190f;--bg:#10150c;--card:#1d2817;--line:#38502c;--brand:#9bd45f;--brand2:#2a4220;border-top:8px solid #9bd45f}
 body[data-sec=soil] button:not(.alt){color:#10200a}
 body[data-sec] #sub{color:var(--brand);font-weight:600}
+.three{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+body[data-sec=solar]{--page:#1c1608;--bg:#171207;--card:#2a2110;--line:#5a4519;--brand:#f2b84b;--brand2:#4a3814;border-top:8px solid #f2b84b}
+body[data-sec=solar] button:not(.alt){color:#2a1a00}
+.pick-solar{border-top:6px solid #f2b84b}.pick-solar button{background:#f2b84b;color:#2a1a00}
 .pick-coast{border-top:6px solid #4cc3e0}.pick-soil{border-top:6px solid #9bd45f}.pick-soil button{background:#9bd45f;color:#10200a}
 @media print{.noprint{display:none!important}body{background:#fff}.card{break-inside:avoid}}
 </style>
@@ -78,9 +82,10 @@ body[data-sec] #sub{color:var(--brand);font-weight:600}
 </header>
 <section id="landing" class="noprint" style="max-width:980px;margin:24px auto;padding:0 16px">
 <h2>What would you like to do?</h2>
-<div class="two">
+<div class="three">
   <div class="card pick-coast"><h3 style="color:#4cc3e0">Coastal area</h3><p style="font-size:18px;margin:6px 0">Do you want to check a coastal area and assess its risk?</p><p class="muted">See which sea and coast trends are getting worse, why, and what to do about them.</p><button id="go-coast">Check a coastal area</button></div>
   <div class="card pick-soil"><h3 style="color:#9bd45f">Soil</h3><p style="font-size:18px;margin:6px 0">Do you want to find which areas of soil are slowly drying out?</p><p class="muted">See where soil wetness is falling over the years, how fast, and what is behind it.</p><button id="go-soil">Find drying soil</button></div>
+  <div class="card pick-solar"><h3 style="color:#f2b84b">Solar radiation and energy</h3><p style="font-size:18px;margin:6px 0">Do you want to see how the sunlight, light for plants and cloud are changing?</p><p class="muted">Checks sunlight, heat sent back down by the air, light for plants, ultraviolet light and cloud, and what they mean for solar power, crops and the sea.</p><button id="go-solar">Check sunlight</button></div>
 </div>
 </section>
 <main id="app" hidden>
@@ -142,6 +147,7 @@ body[data-sec] #sub{color:var(--brand);font-weight:600}
   <div class="card" id="detail" style="margin-top:16px" hidden></div>
   <div class="card noprint" id="calcard" style="margin-top:16px" hidden></div>
   <div class="card" id="rankcard" style="margin-top:16px" hidden></div>
+  <div class="card" id="riskcard" style="margin-top:16px" hidden></div>
 </section>
 
 </main>
@@ -199,6 +205,7 @@ async function loadClim(pi,vid){
   $("climout").innerHTML=h;
 }
 function climHtml(vid){
+  if(DOMAIN==="solar")return "";
   const has=(CFG.projection_for||{})[vid];
   if(!has)return `<div class="note" style="margin-top:12px">Climate models: the Open-Meteo climate models do not give this variable, so only the straight-line outlook above applies.</div>`;
   return `<div id="climproj" class="noprint" style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px"><h3 style="margin:0 0 6px">Climate model projection (7 models)</h3>
@@ -250,7 +257,7 @@ $("run").onclick=async()=>{
   if(modeNow()==="day"&&(!$("d0").value||!$("d1").value)){$("status").textContent="Choose a start and an end date.";return}
   if(!selected.size){$("status").textContent="Choose at least one variable.";return}
   if(modeNow()!=="day"&&!document.querySelector("#mchecks input:checked")){$("status").textContent="Choose at least one month of the year.";return}
-  $("run").disabled=true;$("status").textContent=(DOMAIN==="soil"?"Loading soil data…":"Loading sea data…");$("out").hidden=true;
+  $("run").disabled=true;$("status").textContent=(DOMAIN==="soil"?"Loading soil data…":DOMAIN==="solar"?"Loading sunlight data…":"Loading sea data…");$("out").hidden=true;
   try{LASTBODY=body();RES=await api("/api/run",LASTBODY);for(const k in CAUSES)delete CAUSES[k];for(const k in CAL)delete CAL[k];$("status").textContent="";show()}
   catch(e){$("status").innerHTML='<div class="err">'+esc(e.message)+"</div>"}
   $("run").disabled=false;
@@ -272,7 +279,7 @@ function show(){
   RES.vars.forEach(v=>{h+=`<tr><th scope="row" style="color:var(--ink)">${esc(v.name)}<div class="muted" style="font-weight:500">${esc(v.unit)}</div></th>`+RES.places.map((p,pi)=>`<td role="button" tabindex="0" data-p="${pi}" data-v="${v.id}">${cellHtml(p.vars[v.id].trend,p.vars[v.id].error)}</td><td role="button" tabindex="0" data-p="${pi}" data-v="${v.id}">${alertHtml(p.vars[v.id].alert)}</td>`).join("")+"</tr>"});
   $("matrix").innerHTML=h+"</tbody>";
   const failed=RES.places.filter(p=>p.error);if(failed.length)$("sumtext").textContent+=" No data for: "+failed.map(p=>p.name).join(", ")+".";
-  rankPlaces();safeStart();
+  rankPlaces();safeStart();riskStart();
   detail(0,RES.vars[0].id,false);
 }
 const WETV=["GWETROOT","GWETTOP","GWETPROF"];
@@ -431,7 +438,7 @@ function causeShow(el,R){
 const CAL={};
 async function calStart(pi){
   const el=$("calcard"),b=LASTBODY,pl=RES.places[pi],key=pi+"|"+b.y0+"|"+b.y1;
-  if(b.mode==="day"){el.hidden=true;return}
+  if(b.mode==="day"||DOMAIN==="solar"){el.hidden=true;return}
   el.hidden=false;el.innerHTML=`<h2>${DOMAIN==="soil"?"Farm":"Sea"} calendar: ${esc(pl.name)}</h2><p class="muted" role="status">Loading…</p>`;
   try{if(!CAL[key])CAL[key]=await api("/api/calendar",{domain:DOMAIN,place:{name:pl.name,lat:pl.lat,lon:pl.lon},y0:b.y0,m0:1,y1:b.y1,m1:12,months:[1,2,3,4,5,6,7,8,9,10,11,12]});
     if($("calcard")!==el)return;const R=CAL[key];
@@ -441,6 +448,33 @@ async function calStart(pi){
     <div class="legend" style="margin-top:8px">${R.summary.map(s=>`<span><b>${esc(s[0])}:</b> ${esc(s[1])}</span>`).join("")}</div>
     <h3>Swimming safety</h3><ul style="margin:4px 0 0;padding-left:20px">${CFG.swim_tips.map(t=>`<li>${esc(t)}</li>`).join("")}</ul><p class="muted" style="font-size:13px;margin:6px 0 0">Ratings come from monthly averages, not a beach forecast. Waves show only when the optional wave data loads. Always follow lifeguards and local flags.</p>`}
   catch(e){el.innerHTML=`<h2>Sea calendar</h2><div class="err">${esc(e.message)}</div>`}
+}
+/* ---------- combined risk ---------- */
+const RISKCLS={low:"good",moderate:"watch",high:"warning",danger:"danger"};
+function riskHtml(R){
+  const cls=RISKCLS[R.level]||"neutral",part=k=>{const x=R.parts[k];return x?`<tr><td>${esc(k)}</td><td><span class="lv lv-${RISKCLS[x.level]}">${esc(x.level_text)}</span></td><td>${x.score}</td><td>${x.count}</td></tr>`:""};
+  const lvText={danger:"Alert",warning:"Warning",watch:"Early warning"};
+  return `<div class="issue"><div class="row" style="justify-content:space-between;align-items:center"><h3 style="margin:0">${esc(R.kind==="land"?"Land risk (soil and sunlight)":"Sea and coast risk (coast and sunlight)")}: ${esc(R.place.name)}</h3><span class="lv lv-${cls}">${esc(R.level_text)} risk · ${R.score}/100</span></div>
+  <p style="margin:8px 0">${esc(R.headline)}</p><p class="muted" style="margin:0 0 6px;font-size:14px">${esc(R.period)}</p>
+  <div class="scroll"><table><thead><tr><th>Part</th><th>Level</th><th>Score (0 to 100)</th><th>Measures</th></tr></thead><tbody>${Object.keys(R.parts).map(part).join("")}</tbody></table></div>
+  ${R.drivers.length?`<h3>What is pushing the risk up</h3><div class="scroll"><table><thead><tr><th>Measure</th><th>Alert</th><th>What it means</th></tr></thead><tbody>${R.drivers.map(d=>`<tr><td><b>${esc(d.name)}</b></td><td><span class="lv lv-${ALERT_CLS[d.level]||"neutral"}">${esc(d.text)}</span></td><td>${esc(d.means||"")}</td></tr>`).join("")}</tbody></table></div>`:""}
+  ${R.interactions.length?`<h3>Things that add up</h3><ul style="margin:4px 0 0;padding-left:20px">${R.interactions.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}
+  ${R.good.length?`<p style="margin:10px 0 0"><b>Good news:</b> ${R.good.map(g=>esc(g.name.toLowerCase())).join(", ")}.</p>`:""}
+  <h3>What to do</h3><ul style="margin:4px 0 0;padding-left:20px">${R.recommendations.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
+  ${R.notes.map(n=>`<p class="muted" style="font-size:13px;margin:8px 0 0">${esc(n)}</p>`).join("")}</div>`;
+}
+function riskStart(){
+  const el=$("riskcard");
+  if(!RES||LASTBODY.mode==="day"){el.hidden=true;return}
+  el.hidden=false;
+  const kinds=DOMAIN==="soil"?[["land","Land risk: soil + sunlight"]]:DOMAIN==="coast"?[["sea","Sea risk: coast + sunlight"]]:[["land","Land risk: soil + sunlight"],["sea","Sea risk: coast + sunlight"]];
+  const sel=RES.places.length>1?`<label for="riskplace" style="display:inline-block;margin:0 8px 0 0">Place</label><select id="riskplace" style="width:auto">${RES.places.map((p,i)=>`<option value="${i}">${esc(p.name)}</option>`).join("")}</select> `:"";
+  el.innerHTML=`<h2>Combined risk assessment</h2><p class="muted" style="margin:0 0 10px">Adds up the soil or coast trends and the sunlight trends into one risk level, and gives actions.</p>${sel}${kinds.map(k=>`<button data-rk="${k[0]}">${k[1]}</button>`).join(" ")} <span id="rkst" class="muted" role="status"></span><div id="rkout" style="margin-top:12px"></div>`;
+  el.onclick=async e=>{const b=e.target.closest("[data-rk]");if(!b)return;
+    const pi=+(($("riskplace")||{}).value||0),pl=RES.places[pi],bd=LASTBODY;
+    $("rkst").textContent="Working…";$("rkout").innerHTML="";
+    try{const R=await api("/api/risk",{kind:b.dataset.rk,place:{name:pl.name,lat:pl.lat,lon:pl.lon},y0:bd.y0,m0:bd.m0,y1:bd.y1,m1:bd.m1,months:bd.months,mode:bd.mode});$("rkst").textContent="";$("rkout").innerHTML=riskHtml(R)}
+    catch(err){$("rkst").textContent="";$("rkout").innerHTML=`<div class="err">${esc(err.message)}</div>`}};
 }
 /* ---------- recommendation and verdict ---------- */
 function verdictHtml(a,C,pi){
@@ -475,9 +509,9 @@ function setDomain(d){
   DOMAIN=d;document.body.dataset.sec=d;selected.clear();(CFG.defaults[d]||[]).forEach(v=>selected.add(v));places.length=0;renderChips();RES=null;
   renderVars();$("out").hidden=true;$("status").textContent="";
   $("landing").hidden=true;$("app").hidden=false;$("switchwrap").hidden=false;
-  $("sub").textContent=d==="soil"?"Soil section: find where the soil is slowly drying.":"Coastal area section: check sea and coast trends and assess risk.";
+  $("sub").textContent=d==="soil"?"Soil section: find where the soil is slowly drying.":d==="solar"?"Solar radiation section: check sunlight, light for plants and cloud.":"Coastal area section: check sea and coast trends and assess risk.";
   $("q").placeholder=d==="soil"?"Dubai, Nairobi, Oslo…":"Dubai, Mombasa, Miami…";
-  $("regnote").textContent=d==="soil"?"Regional data (about 50 km), not one field.":"Regional data (about 25 to 50 km), not one beach.";
+  $("regnote").textContent=d==="soil"?"Regional data (about 50 km), not one field.":d==="solar"?"Satellite and model data (about 50 km), not one roof or field.":"Regional data (about 25 to 50 km), not one beach.";
 }
 async function start(){
   CFG=await api("/api/config");
@@ -495,7 +529,7 @@ async function start(){
   const iso=d=>d.toISOString().slice(0,10),end=new Date(Date.now()-6*864e5),beg=new Date(end.getTime()-59*864e5);$("d0").value=iso(beg);$("d1").value=iso(end);$("d1").max=iso(end);
   const tog=()=>{const dm=modeNow()==="day";$("daybox").hidden=!dm;$("monthbox").hidden=dm};document.querySelectorAll("input[name=mode]").forEach(x=>x.onchange=tog);tog();
   renderChips();
-  $("go-coast").onclick=()=>setDomain("coast");$("go-soil").onclick=()=>setDomain("soil");
+  $("go-coast").onclick=()=>setDomain("coast");$("go-soil").onclick=()=>setDomain("soil");$("go-solar").onclick=()=>setDomain("solar");
   $("switch").onclick=()=>{$("app").hidden=true;delete document.body.dataset.sec;$("landing").hidden=false;$("switchwrap").hidden=true;$("sub").textContent="Coastal Area and Soil Trend Detection"};
 }
 start().catch(e=>{$("status").textContent="Could not start: "+e.message});

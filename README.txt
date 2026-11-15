@@ -1,7 +1,7 @@
 CASTD: Coastal Area and Soil Trend Detection (NASA Space Apps Challenge, Earth science trends)
 
-Run: install Python (tick "Add to PATH"), double-click run.bat. Opens http://127.0.0.1:9034
-This release uses port 9034 (every release uses a new port).
+Run: install Python (tick "Add to PATH"), double-click run.bat. Opens http://127.0.0.1:9035
+This release uses port 9035 (every release uses a new port).
 
 Two separate sections. The start screen asks which one you want:
   1. Coastal section: "Do you want to check a coastal area and assess its risk?"
@@ -40,3 +40,11 @@ Climate model projection (inside the long-term outlook)
   from up to 7 climate models (Open-Meteo Climate API), plus your own latest data carried forward by that change. Available for wind and soil wetness only.
   Soil water exists in only 2 of the 7 models (the page says so). The models have no sea temperature, sea level or waves.
   These are projections, not forecasts. The models end in 2050. NOT TESTED LIVE: tested on simulated answers only.
+
+Solar radiation and combined risk (port 9035)
+  New third section "Solar radiation and energy": sunlight (all sky and clear sky), sunlight blocked by clouds (worked out here), heat radiated down by the air,
+  light for plants, ultraviolet index and cloud, all from NASA POWER. Alerts are plain-word and depend on use (solar power, crops, sea).
+  Soil causes now also test evaporation (EVLAND), plant transpiration (EVPTRNS) and top-layer soil temperature (TSOIL1).
+  "Combined risk assessment" card at the bottom of every section: land = soil + sunlight, sea = coast + sunlight. It gives a 0 to 100 score, a level, what pushes it up and actions.
+  NOT TESTED WITH NASA: tested only on simulated data. Not checked live: that POWER monthly really returns EVLAND, EVPTRNS, TSOIL1 and the ultraviolet index at every place, and their units.
+  Left out on purpose: SFMC, RZMC, PRMC and the percentile versions (not standard POWER monthly parameters; the wetness fractions already cover them), TSOIL2 to TSOIL6, longwave/clear-sky longwave and the evapotranspiration total (evaporation and transpiration are shown separately).

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """CASTD, Coastal Area and Soil Trend Detection: choose the coast section or the soil section, pick places on a map, choose measures, and see which ones are changing, whether the change is significant, the long-term outlook and what to do.
 
-    python trend_app.py            starts http://127.0.0.1:9034 and opens it in your browser
+    python trend_app.py            starts http://127.0.0.1:9035 and opens it in your browser
 
 Data: NASA POWER (power.larc.nasa.gov), 1981 to the last full year, plus optional NOAA, PSMSL and Open-Meteo sea data (ocean.py). Statistics: stats.py (regression + t-test, Mann-Kendall, Theil-Sen with 95% interval).
 """
@@ -29,11 +29,12 @@ import climate      # noqa: E402
 import events       # noqa: E402
 import coast        # noqa: E402
 import soil         # noqa: E402
+import solar        # noqa: E402
 import ocean        # noqa: E402
 import stats        # noqa: E402
 import trends       # noqa: E402
 
-DEFAULT_PORT = 9034             # changed on every new release so an older copy still running does not answer instead
+DEFAULT_PORT = 9035             # changed on every new release so an older copy still running does not answer instead
 GETTER = trends.get_json        # tests replace this
 
 
@@ -84,6 +85,17 @@ def _calendar(body: dict) -> dict:
     return coast.sea_calendar(pl[0], y0, m0, y1, m1, list(body.get("months") or range(1, 13)), GETTER)
 
 
+def _risk(body: dict) -> dict:
+    y0, m0, y1, m1 = _period(body)
+    pl = _places({"places": [body.get("place") or {}]})
+    if not pl:
+        raise ValueError("Choose a place.")
+    mode = str(body.get("mode") or "year")
+    if mode not in ("year", "month"):
+        raise ValueError("The combined risk needs one value per year or every month. It does not work with exact dates.")
+    return solar.assess("sea" if str(body.get("kind")) == "sea" else "land", pl[0], y0, m0, y1, m1, list(body.get("months") or range(1, 13)), mode, GETTER)
+
+
 def _events(body: dict) -> dict:
     y0, _m0, y1, _m1 = _period(body)
     pl = _places({"places": [body.get("place") or {}]})
@@ -110,7 +122,7 @@ def _day(v) -> date:
 
 
 def _run(body: dict) -> dict:
-    domain = "soil" if str(body.get("domain")) == "soil" else "coast"
+    domain = str(body.get("domain")) if str(body.get("domain")) in ("soil", "solar") else "coast"
     DEF = trends.DEFAULTS[domain]
     if str(body.get("mode")) == "day":
         d0, d1 = _day(body.get("d0")), _day(body.get("d1"))
@@ -124,7 +136,9 @@ def _run(body: dict) -> dict:
         raise ValueError("NASA did not answer: " + "; ".join(res["errors"]))
     for pl in res["places"]:
         for vid, r in pl["vars"].items():
-            if domain == "soil":
+            if domain == "solar":
+                r["alert"] = solar.alert_for(vid, r["trend"], "solar")
+            elif domain == "soil":
                 r["alert"] = soil.alert_for(vid, r["trend"])
                 if r["alert"] is not None:
                     r["alert"]["policy"] = coast.soil_policy(vid, r["alert"], r["trend"])
@@ -192,6 +206,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(_causes(body))
             elif p == "/api/calendar":
                 self._json(_calendar(body))
+            elif p == "/api/risk":
+                self._json(_risk(body))
             elif p == "/api/projection":
                 self._json(climate.project(float(body["lat"]), float(body["lon"]), int(body.get("year") or 2040), "soil" if str(body.get("domain")) == "soil" else "coast", vid=str(body.get("vid") or "")))
             elif p == "/api/eonet":

@@ -44,6 +44,9 @@ DRIVERS = {
     "WS10M": {"name": "Wind speed at 10 m", "unit": "m/s", "source": "power", "from": "NASA POWER"},
     "GWETROOT": {"name": "Root-zone soil wetness", "unit": "0 to 1", "source": "power", "from": "NASA POWER (MERRA-2)"},
     "GWETTOP": {"name": "Surface soil wetness", "unit": "0 to 1", "source": "power", "from": "NASA POWER (MERRA-2)"},
+    "EVLAND": {"name": "Evaporation from land", "unit": "", "source": "power", "from": "NASA POWER (MERRA-2)"},
+    "EVPTRNS": {"name": "Water given off by plants (transpiration)", "unit": "", "source": "power", "from": "NASA POWER (MERRA-2)"},
+    "TSOIL1": {"name": "Soil temperature, top layer", "unit": "°C", "source": "power", "from": "NASA POWER (MERRA-2)"},
     "PS": {"name": "Air pressure at the surface", "unit": "kPa", "source": "power", "from": "NASA POWER"},
     "TS": {"name": "Sea surface temperature", "unit": "°C", "source": "power", "from": "NASA POWER (MERRA-2 skin temperature)"},
     "WS50M": {"name": "Wind speed at 50 m", "unit": "m/s", "source": "power", "from": "NASA POWER"},
@@ -92,6 +95,9 @@ _SOIL_COMMON = [
     ("RH2M", 1, "Humid air slows evaporation, so the soil keeps its water longer."),
     ("WS10M", -1, "Wind carries away the moist air at the soil surface and dries it faster."),
     ("CLOUD_AMT", 1, "Clouds shade the ground and usually come with rain."),
+    ("EVLAND", -1, "Evaporation is water leaving the ground as vapour, so more evaporation means a drier soil. A wet soil also evaporates more, so this can work both ways."),
+    ("EVPTRNS", -1, "Plants pull water out of the soil and give it off through their leaves (transpiration). Evaporation and transpiration together are called evapotranspiration, the biggest water loss from farmland."),
+    ("TSOIL1", -1, "A warmer soil loses water faster and stresses roots."),
     ("ONI", 0, "El Niño and La Niña shift rain belts. The direction depends on the region."),
 ]
 _SEA = [
@@ -118,6 +124,14 @@ _WAVEC = [
     ("TS", 1, "A warmer sea feeds stronger storms."),
     ("ONI", 0, "El Niño and La Niña change storm tracks. The direction depends on the region."),
 ]
+_SKY = [("AOD_55", -1, "Haze and dust block and scatter sunlight."), ("TQV", -1, "Water vapour absorbs some sunlight on its way down."), ("TO3", -1, "Ozone absorbs ultraviolet light.")]
+KB.update({
+    "CLRSKY_SFC_SW_DWN": _SKY,
+    "CLOUD_LOSS": [("CLOUD_AMT", 1, "More cloud blocks more sunlight."), ("AOD_55", 1, "Haze makes clouds brighter and thicker, so they block more light."), ("TQV", 1, "More water in the air means thicker cloud and more blocked light."), ("RH2M", 1, "Humid air forms more cloud.")],
+    "ALLSKY_SFC_LW_DWN": [("CO2", 1, "Carbon dioxide traps heat in the air and sends part of it back down."), ("TQV", 1, "Water vapour is a strong greenhouse gas that sends heat back down."), ("T2M", 1, "A warmer air layer radiates more heat downward."), ("CLOUD_AMT", 1, "Clouds act like a blanket and send heat back down.")],
+    "ALLSKY_SFC_PAR_TOT": [("CLOUD_AMT", -1, "Clouds block the light plants use."), ("AOD_55", -1, "Haze and dust block and scatter that light."), ("TQV", -1, "Water vapour absorbs part of the sunlight.")],
+    "ALLSKY_SFC_UV_INDEX": [("TO3", -1, "A thinner ozone layer lets more ultraviolet light through."), ("CLOUD_AMT", -1, "Clouds block part of the ultraviolet light."), ("AOD_55", -1, "Haze and dust block ultraviolet light.")],
+})
 KB.update({"GWETROOT": _SOIL_COMMON, "GWETTOP": _SOIL_COMMON, "GWETPROF": _SOIL_COMMON})
 KB.update({"TS": _SEA, "SST_OI": _SEA, "SEALEVEL": _SEALEVEL, "WAVE": _WAVEC, "WAVEP": _WAVEC, "WS50M": KB["WS10M"]})
 _WATERLOSS = [

@@ -74,7 +74,8 @@ POLICY["soil_wet"] = ["Improve drainage and flood storage in low fields.", "Keep
 _SOIL_HARM = {"T2M": ("rising", "hotter air (dries the soil)"), "T2M_MAX": ("rising", "hotter days (dries the soil)"), "TS": ("rising", "hotter ground"),
               "WS10M": ("rising", "stronger wind (dries the soil)"), "PRECTOTCORR": ("falling", "less rain"), "RH2M": ("falling", "drier air"),
               "ALLSKY_SFC_SW_DWN": ("rising", "more sunlight (more evaporation)"), "CLOUD_AMT": ("falling", "less cloud"),
-              "CO2": ("rising", "more carbon dioxide (more warming)"), "QV2M": ("falling", "less water vapour in the air")}
+              "CO2": ("rising", "more carbon dioxide (more warming)"), "QV2M": ("falling", "less water vapour in the air"),
+              "EVLAND": ("rising", "more evaporation from the ground"), "EVPTRNS": ("rising", "plants giving off more water"), "TSOIL1": ("rising", "warmer soil (it loses water faster)")}
 
 
 def soil_policy(vid: str, alert: dict | None, trend: dict | None) -> list:
@@ -94,6 +95,8 @@ _HARM = {"TS": ("rising", "warmer sea", "sea"), "T2M": ("rising", "hotter air", 
 
 def driver_harm(vid: str, trend: dict | None, domain: str = "coast") -> dict | None:
     """Is this possible cause itself trending in a way that is bad for the coast (or for the soil)?"""
+    if domain == "solar":
+        return None
     if domain == "soil":
         h = _SOIL_HARM.get(vid)
         key = "soil_dry"

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import statistics
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -29,8 +30,16 @@ VARIABLES = [
     ("RH2M", "Air humidity (relative)", "%", "Air above the sea", "MERRA-2 model (NASA GMAO)", False),
     ("QV2M", "Water vapour in the air", "g/kg", "Air above the sea", "MERRA-2 model (NASA GMAO)", True),
     ("PRECTOTCORR", "Rain", "mm/day", "Rain and sky", "MERRA-2 corrected with satellite and gauge rain (NASA)", True),
-    ("CLOUD_AMT", "Cloud cover", "%", "Rain and sky", "NASA satellite cloud data (CERES/MERRA-2)", False),
-    ("ALLSKY_SFC_SW_DWN", "Sunlight reaching the sea", "kWh/m²/day", "Rain and sky", "CERES satellite (NASA)", True),
+    ("CLOUD_AMT", "Cloud cover", "%", "Sunlight and cloud", "NASA satellite cloud data (CERES/MERRA-2)", False),
+    ("ALLSKY_SFC_SW_DWN", "Sunlight reaching the ground (all sky)", "kWh/m²/day", "Sunlight and cloud", "CERES satellite (NASA)", True),
+    ("CLRSKY_SFC_SW_DWN", "Sunlight reaching the ground (clear sky, no clouds)", "kWh/m²/day", "Sunlight and cloud", "CERES satellite (NASA)", True),
+    ("CLOUD_LOSS", "Sunlight blocked by clouds (clear sky minus all sky)", "kWh/m²/day", "Sunlight and cloud", "Worked out here from two NASA POWER series", True),
+    ("ALLSKY_SFC_LW_DWN", "Heat radiated back down by the air", "W/m²", "Heat and light", "CERES satellite (NASA)", True),
+    ("ALLSKY_SFC_PAR_TOT", "Light that plants use for growth (photosynthetically active radiation)", "W/m²", "Heat and light", "CERES satellite (NASA)", True),
+    ("ALLSKY_SFC_UV_INDEX", "Ultraviolet index", "index", "Heat and light", "NASA POWER, where available", True),
+    ("EVLAND", "Evaporation from land", "", "Soil water loss", "MERRA-2 model (NASA GMAO)", True),
+    ("EVPTRNS", "Water given off by plants (transpiration)", "", "Soil water loss", "MERRA-2 model (NASA GMAO)", True),
+    ("TSOIL1", "Soil temperature, top layer", "°C", "Soil water loss", "MERRA-2 model (NASA GMAO)", False),
 ]
 import ocean  # noqa: E402
 
@@ -43,10 +52,11 @@ for _i, _g in ocean.OC.items():
 # only the main sea characteristics are offered as measures; everything else is used as a possible cause
 SOIL_SELECTABLE = ["GWETTOP", "GWETROOT", "GWETPROF"]
 COAST_SELECTABLE = ["TS", "WS10M", "SEALEVEL", "WAVE", "WAVEP"]
-SELECTABLE = COAST_SELECTABLE + SOIL_SELECTABLE
-DEFAULTS = {"coast": ["TS", "WS10M"], "soil": ["GWETTOP", "GWETROOT", "GWETPROF"]}
+SOLAR_SELECTABLE = ["ALLSKY_SFC_SW_DWN", "CLRSKY_SFC_SW_DWN", "CLOUD_LOSS", "CLOUD_AMT", "ALLSKY_SFC_LW_DWN", "ALLSKY_SFC_PAR_TOT", "ALLSKY_SFC_UV_INDEX"]
+SELECTABLE = COAST_SELECTABLE + SOIL_SELECTABLE + SOLAR_SELECTABLE
+DEFAULTS = {"coast": ["TS", "WS10M"], "soil": ["GWETTOP", "GWETROOT", "GWETPROF"], "solar": ["ALLSKY_SFC_SW_DWN", "CLRSKY_SFC_SW_DWN", "CLOUD_LOSS", "ALLSKY_SFC_LW_DWN", "ALLSKY_SFC_PAR_TOT"]}
 for _i in BY_ID:
-    BY_ID[_i]["domain"] = "soil" if _i in SOIL_SELECTABLE else "coast"
+    BY_ID[_i]["domain"] = "soil" if _i in SOIL_SELECTABLE else "solar" if _i in SOLAR_SELECTABLE else "coast"
 DEFAULT_SELECTION = ["TS", "WS10M"]
 OCEAN_SELECTION = ["TS", "WS10M", "SEALEVEL", "WAVE", "WAVEP"]
 
@@ -79,6 +89,8 @@ def parse_power(js: dict, params: list) -> dict:
     out = {}
     for p in params:
         out[p] = {k: float(v) for k, v in (par.get(p) or {}).items() if len(k) == 6 and k[4:] != "13" and v is not None and float(v) > -998}
+        if p.startswith("TSOIL") and out[p] and statistics.fmean(out[p].values()) > 150:      # some NASA files give soil temperature in kelvin
+            out[p] = {k: v - 273.15 for k, v in out[p].items()}
     return out
 
 
@@ -89,6 +101,9 @@ def cell_of(lat: float, lon: float) -> tuple:
 def fetch_cell(cell: tuple, params: list, y0: int, y1: int, getter) -> dict:
     """Series for each parameter. Ocean extra ids go to NOAA, PSMSL or Open-Meteo (ocean.py), the rest to NASA POWER.
     The answer also holds "_errors": {id: text} for series that could not be downloaded."""
+    derived = "CLOUD_LOSS" in params
+    if derived:
+        params = [p for p in params if p != "CLOUD_LOSS"] + [x for x in ("CLRSKY_SFC_SW_DWN", "ALLSKY_SFC_SW_DWN") if x not in params]
     g_ids = [p for p in params if p in ocean.OC]
     p_ids = [p for p in params if p not in ocean.OC]
     out: dict = {}
@@ -101,6 +116,9 @@ def fetch_cell(cell: tuple, params: list, y0: int, y1: int, getter) -> dict:
                 raise DataError("Sea data: " + "; ".join(sorted(set(errs.values()))))
     if p_ids:
         out.update(_fetch_power(cell, p_ids, y0, y1, getter))
+    if derived:
+        clear, allsky = out.get("CLRSKY_SFC_SW_DWN") or {}, out.get("ALLSKY_SFC_SW_DWN") or {}
+        out["CLOUD_LOSS"] = {k: clear[k] - allsky[k] for k in clear if k in allsky}
     return out
 
 
@@ -266,7 +284,7 @@ def run(places: list, var_ids: list, y0: int, m0: int, y1: int, m1: int, months:
 
 def run_daily(places: list, var_ids: list, d0, d1, getter) -> dict:
     """Exact dates, one value per day. Strong day-to-day similarity is corrected for in the p-values."""
-    var_ids = [v for v in var_ids if v not in ocean.OC]
+    var_ids = [v for v in var_ids if v not in ocean.OC and v != "CLOUD_LOSS"]
     if not var_ids:
         raise ValueError("Choose at least one variable.")
     if not places:
