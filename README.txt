@@ -1,7 +1,7 @@
 CASTD: Coastal Area and Soil Trend Detection (NASA Space Apps Challenge, Earth science trends)
 
-Run: install Python (tick "Add to PATH"), double-click run.bat. Opens http://127.0.0.1:9032
-This release uses port 9032 (every release uses a new port).
+Run: install Python (tick "Add to PATH"), double-click run.bat. Opens http://127.0.0.1:9033
+This release uses port 9033 (every release uses a new port).
 
 Two separate sections. The start screen asks which one you want:
   1. Coastal section: "Do you want to check a coastal area and assess its risk?"

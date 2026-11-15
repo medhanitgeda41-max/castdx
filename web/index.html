@@ -16,7 +16,7 @@ main{max-width:1120px;margin:0 auto;padding:8px 20px 60px;display:grid;grid-temp
 .two{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px}
 @media (max-width:860px){.two{grid-template-columns:minmax(0,1fr)}}
 #map{height:340px;border-radius:10px;border:1px solid var(--line);background:var(--brand2)}
-#maperr{color:var(--mute);padding:14px}
+#maperr{color:var(--mute);padding:6px 2px;font-size:13px}
 label{display:block;font-weight:600;font-size:14px;margin:10px 0 4px}
 input[type=text],input[type=number],select{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink);font:inherit}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}.grow{flex:1;min-width:120px}
@@ -88,7 +88,7 @@ body[data-sec] #sub{color:var(--brand);font-weight:600}
   <div class="card">
     <h2>1. Choose places</h2>
     <p class="muted" style="margin:0 0 8px">Click the sea or coast on the map, or search.</p>
-    <div id="map" aria-label="Google 3D globe. Click to add a place."><div id="maperr" hidden>The Google 3D globe could not load. Use the search box or type coordinates.</div></div>
+    <div id="maperr" hidden></div><div id="map" aria-label="Map. Click to add a place."></div>
     <div class="row" style="margin-top:6px">
       <div class="grow"><label for="q">Search a place</label><input type="text" id="q" placeholder="Dubai, Mombasa, Miami…"></div>
       <button class="alt" id="qgo">Search</button>
@@ -165,9 +165,24 @@ async function initGoogleGlobe(){
   GM3=await google.maps.importLibrary("maps3d");
   const m=new GM3.Map3DElement({mode:"HYBRID",center:{lat:22,lng:30,altitude:0},range:18000000,tilt:0,heading:0});
   m.style.cssText="width:100%;height:100%;display:block";
-  m.addEventListener("gmp-error",()=>{$("maperr").textContent="Google 3D globe error. Use the search box or type coordinates.";$("maperr").hidden=false});
+  m.addEventListener("gmp-error",async()=>{if(LF)return;try{markers.forEach(x=>x.remove());markers=[];m.remove();GM3=null;await initFlatMap();renderChips();$("maperr").textContent="The Google 3D globe had an error, so the flat map is shown instead.";$("maperr").hidden=false}catch(e){$("maperr").textContent="Google 3D globe error. Use the search box or type coordinates.";$("maperr").hidden=false}});
   m.addEventListener("gmp-click",e=>{const p=e.position;if(p)addPlace(p.lat,((p.lng+540)%360)-180)});
   $("map").prepend(m);map=m;
+}
+let LF=null;
+function loadFlat(){
+  return new Promise((res,rej)=>{
+    if(window.L)return res();
+    const c=document.createElement("link");c.rel="stylesheet";c.href="/lib/leaflet.css";document.head.append(c);
+    const t=document.createElement("script");t.src="/lib/leaflet.js";t.onload=()=>res();t.onerror=()=>rej(new Error("flat map files missing"));document.head.append(t)})
+}
+async function initFlatMap(){
+  await loadFlat();
+  const el=$("map");el.querySelectorAll("gmp-map-3d").forEach(x=>x.remove());
+  LF=L.map(el,{worldCopyJump:true,minZoom:1}).setView([22,30],2);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:18,attribution:"&copy; OpenStreetMap contributors"}).addTo(LF);
+  LF.on("click",e=>addPlace(e.latlng.lat,((e.latlng.lng+540)%360)-180));
+  map=LF;setTimeout(()=>LF.invalidateSize(),50);
 }
 let PYEAR=2040,PSEQ=0;
 const PCH=(x,k)=>(x>0?"+":"")+x.toFixed(k==="add"?1:0)+(k==="add"?" °C":"%");
@@ -206,7 +221,8 @@ async function api(path,body){const r=await fetch(path,{method:body?"POST":"GET"
 
 function renderChips(){
   $("chips").innerHTML=places.map((p,i)=>`<span class="chip">${esc(p.name)}<button data-rm="${i}" aria-label="Remove ${esc(p.name)}">×</button></span>`).join("")||'<span class="muted">No places yet.</span>';
-  if(map&&GM3){markers.forEach(m=>m.remove());markers=places.map(p=>{const m=new GM3.Marker3DElement({position:{lat:p.lat,lng:p.lon,altitude:0},altitudeMode:"CLAMP_TO_GROUND",label:p.name.slice(0,24)});map.append(m);return m})}
+  if(map&&LF&&map===LF){markers.forEach(m=>m.remove());markers=places.map(p=>L.marker([p.lat,p.lon],{title:p.name}).addTo(LF))}
+  else if(map&&GM3){markers.forEach(m=>m.remove());markers=places.map(p=>{const m=new GM3.Marker3DElement({position:{lat:p.lat,lng:p.lon,altitude:0},altitudeMode:"CLAMP_TO_GROUND",label:p.name.slice(0,24)});map.append(m);return m})}
 
 }
 function addPlace(lat,lon,name){
@@ -221,7 +237,7 @@ async function search(){
   const q=$("q").value.trim();if(!q)return;$("hits").innerHTML='<span class="muted">Searching…</span>';
   try{const r=await fetch("https://geocoding-api.open-meteo.com/v1/search?count=5&language=en&name="+encodeURIComponent(q));const j=await r.json();
     const list=j.results||[];$("hits").innerHTML=list.length?list.map((h,i)=>`<button data-h="${i}">${esc(h.name)}${h.admin1?", "+esc(h.admin1):""}, ${esc(h.country||"")}</button>`).join(""):'<span class="muted">Nothing found. Try another spelling.</span>';
-    $("hits").onclick=e=>{const b=e.target.closest("[data-h]");if(!b)return;const h=list[+b.dataset.h];addPlace(h.latitude,h.longitude,h.name+(h.country_code?" ("+h.country_code+")":""));if(map)try{map.flyCameraTo({endCamera:{center:{lat:h.latitude,lng:h.longitude,altitude:0},range:900000,tilt:0,heading:0},durationMillis:2500})}catch(e){};$("hits").innerHTML=""}}
+    $("hits").onclick=e=>{const b=e.target.closest("[data-h]");if(!b)return;const h=list[+b.dataset.h];addPlace(h.latitude,h.longitude,h.name+(h.country_code?" ("+h.country_code+")":""));if(map&&map===LF)try{LF.setView([h.latitude,h.longitude],7)}catch(e){}else if(map)try{map.flyCameraTo({endCamera:{center:{lat:h.latitude,lng:h.longitude,altitude:0},range:900000,tilt:0,heading:0},durationMillis:2500})}catch(e){};$("hits").innerHTML=""}}
   catch(e){$("hits").innerHTML='<span class="muted">Search needs the internet. You can type coordinates instead.</span>'}
 }
 $("qgo").onclick=search;$("q").onkeydown=e=>{if(e.key==="Enter")search()};
@@ -477,7 +493,11 @@ async function start(){
   document.querySelectorAll("[data-season]").forEach(b=>b.onclick=()=>{const set=new Set(b.dataset.season.split(",").map(Number));document.querySelectorAll("#mchecks input").forEach(c=>c.checked=set.has(+c.value))});
   $("y0").value=CFG.first_year;$("y1").value=CFG.last_year;$("y0").min=CFG.first_year;$("y1").max=CFG.max_year;
   try{await initGoogleGlobe()}
-  catch(e){map=null;$("maperr").textContent=(CFG.google_key?"The Google 3D globe could not load ("+e.message+"). ":"No Google Maps key is set (add GOOGLE_MAPS_API_KEY). ")+"Use the search box or type coordinates.";$("maperr").hidden=false}
+  catch(e){
+    map=null;const why=CFG.google_key?"The Google 3D globe could not load ("+e.message+")":"No Google Maps key is set";
+    try{await initFlatMap();$("maperr").textContent=why+", so the flat map is shown instead.";$("maperr").hidden=false}
+    catch(e2){$("maperr").textContent=why+", and the flat map could not load either. Use the search box or type coordinates.";$("maperr").hidden=false}
+  }
   const iso=d=>d.toISOString().slice(0,10),end=new Date(Date.now()-6*864e5),beg=new Date(end.getTime()-59*864e5);$("d0").value=iso(beg);$("d1").value=iso(end);$("d1").max=iso(end);
   const tog=()=>{const dm=modeNow()==="day";$("daybox").hidden=!dm;$("monthbox").hidden=dm};document.querySelectorAll("input[name=mode]").forEach(x=>x.onchange=tog);tog();
   renderChips();

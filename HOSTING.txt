@@ -5,3 +5,10 @@ CASTD on the web: see the step-by-step guide in the chat. Short version (Render)
 Hugging Face Spaces: New Space > Docker > upload these files (the Dockerfile is included).
 
 Google 3D globe: on Render add the Environment Variable GOOGLE_MAPS_API_KEY (your Google Maps key, restricted to your website). Never put the key in a file on GitHub.
+
+Render file (render.yaml)
+-------------------------
+render.yaml lists GOOGLE_MAPS_API_KEY with "sync: false". Render shows an empty box for it
+in Environment; paste your key there. The key itself is never written in any file.
+If the Google 3D globe does not load (no key, key refused, or no connection), the page shows
+a flat 2D map instead.
