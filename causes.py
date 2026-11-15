@@ -118,8 +118,8 @@ _WAVEC = [
     ("TS", 1, "A warmer sea feeds stronger storms."),
     ("ONI", 0, "El Niño and La Niña change storm tracks. The direction depends on the region."),
 ]
-KB.update({"GWETROOT": _SOIL_COMMON, "GWETTOP": _SOIL_COMMON, "GWETPROF": _SOIL_COMMON})
-KB.update({"TS": _SEA, "SST_OI": _SEA, "SEALEVEL": _SEALEVEL, "WAVE": _WAVEC, "WAVEP": _WAVEC, "WS50M": KB["WS10M"]})
+KB.update({"MM_SMD": _SOIL_COMMON, "GWETROOT": _SOIL_COMMON, "GWETTOP": _SOIL_COMMON, "GWETPROF": _SOIL_COMMON})
+KB.update({"TS": _SEA, "SST_OI": _SEA, "SEALEVEL": _SEALEVEL, "WAVE": _WAVEC, "WAVEP": _WAVEC, "MM_SWELL": _WAVEC, "WS50M": KB["WS10M"]})
 _WATERLOSS = [
     ("T2M", 1, "Hotter air gives more energy to turn soil and plant water into vapour."),
     ("ALLSKY_SFC_SW_DWN", 1, "More sunlight gives more energy for evaporation."),
