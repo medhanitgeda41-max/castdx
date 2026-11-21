@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """CASTD, Coastal Area and Soil Trend Detection: choose the coast section or the soil section, pick places on a map, choose measures, and see which ones are changing, whether the change is significant, the long-term outlook and what to do.
 
-    python trend_app.py            starts http://127.0.0.1:9035 and opens it in your browser
+    python trend_app.py            starts http://127.0.0.1:9036 and opens it in your browser
 
 Data: NASA POWER (power.larc.nasa.gov), 1981 to the last full year, plus optional NOAA, PSMSL and Open-Meteo sea data (ocean.py). Statistics: stats.py (regression + t-test, Mann-Kendall, Theil-Sen with 95% interval).
 """
@@ -34,7 +34,7 @@ import ocean        # noqa: E402
 import stats        # noqa: E402
 import trends       # noqa: E402
 
-DEFAULT_PORT = 9035             # changed on every new release so an older copy still running does not answer instead
+DEFAULT_PORT = 9036             # changed on every new release so an older copy still running does not answer instead
 GETTER = trends.get_json        # tests replace this
 
 
@@ -183,6 +183,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if p in ("/", "/index.html"):
                 self._send(200, (BASE / "web" / "index.html").read_bytes(), "text/html; charset=utf-8")
+            elif p in ("/build", "/build.html"):
+                self._send(200, (BASE / "web" / "build.html").read_bytes(), "text/html; charset=utf-8")
             elif p == "/api/config":
                 self._json(api_config())
             elif p.startswith("/lib/"):

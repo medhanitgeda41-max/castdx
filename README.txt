@@ -1,7 +1,7 @@
 CASTD: Coastal Area and Soil Trend Detection (NASA Space Apps Challenge, Earth science trends)
 
-Run: install Python (tick "Add to PATH"), double-click run.bat. Opens http://127.0.0.1:9035
-This release uses port 9035 (every release uses a new port).
+Run: install Python (tick "Add to PATH"), double-click run.bat. Opens http://127.0.0.1:9036
+This release uses port 9036 (every release uses a new port).
 
 Two separate sections. The start screen asks which one you want:
   1. Coastal section: "Do you want to check a coastal area and assess its risk?"
@@ -41,10 +41,17 @@ Climate model projection (inside the long-term outlook)
   Soil water exists in only 2 of the 7 models (the page says so). The models have no sea temperature, sea level or waves.
   These are projections, not forecasts. The models end in 2050. NOT TESTED LIVE: tested on simulated answers only.
 
-Solar radiation and combined risk (port 9035)
+Solar radiation and combined risk (port 9036)
   New third section "Solar radiation and energy": sunlight (all sky and clear sky), sunlight blocked by clouds (worked out here), heat radiated down by the air,
   light for plants, ultraviolet index and cloud, all from NASA POWER. Alerts are plain-word and depend on use (solar power, crops, sea).
   Soil causes now also test evaporation (EVLAND), plant transpiration (EVPTRNS) and top-layer soil temperature (TSOIL1).
   "Combined risk assessment" card at the bottom of every section: land = soil + sunlight, sea = coast + sunlight. It gives a 0 to 100 score, a level, what pushes it up and actions.
   NOT TESTED WITH NASA: tested only on simulated data. Not checked live: that POWER monthly really returns EVLAND, EVPTRNS, TSOIL1 and the ultraviolet index at every place, and their units.
   Left out on purpose: SFMC, RZMC, PRMC and the percentile versions (not standard POWER monthly parameters; the wetness fractions already cover them), TSOIL2 to TSOIL6, longwave/clear-sky longwave and the evapotranspiration total (evaporation and transpiration are shown separately).
+
+Make your next building climate resilient (new section, port 9036)
+- A fourth card on the first screen opens /build. It is its own page; the "CASTD" button at the top goes back.
+- Choose the place first, then the building type, then shape it in 3D with sliders and buttons. It compares a standard, your own and an optimized design (cost, yearly loss, residual risk, lender grade).
+- Live data is read by the browser directly: Open-Meteo (climate model, ground height, place search), USGS (earthquakes), OpenStreetMap map tiles. If one cannot be read, typical values are used and it says so. No key or secret is needed.
+- Not tested live: only tested with simulated answers. The loss rates and costs are simple rules of thumb, not engineering results.
+- Files: web/build.html and web/lib/build/ (engine.js, presets.js, app.js, style.css, three.min.js).

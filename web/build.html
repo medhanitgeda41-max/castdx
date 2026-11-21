@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CASTD: Make your next building climate resilient</title>
+<link rel="stylesheet" href="/lib/leaflet.css">
+<link rel="stylesheet" href="/lib/build/style.css"></head>
+<body>
+<header class="top">
+  <a class="btn2" href="/" style="text-decoration:none;color:#fff;background:transparent;border-color:#38566a">&larr; CASTD</a>
+  <div class="brand">Make your next building climate resilient<small>Choose the place, shape the building, compare the risk</small></div>
+  <nav id="steps" hidden aria-label="Steps">
+    <button data-s="1">1 Place</button><button data-s="2" class="on">2 Site hazards</button><button data-s="3">3 Building</button><button data-s="4">4 Design</button><button data-s="5">5 Compare</button>
+  </nav>
+  <div class="sc" id="scbox" hidden role="group" aria-label="Climate scenario">
+    <button data-sc="now">Today</button><button data-sc="mid" class="on">2050 projected</button><button data-sc="stress">2050 stress test</button>
+  </div>
+</header>
+
+<section id="s-place">
+  <div id="pmap"></div>
+  <div class="pcard">
+    <h1>Step 1. Where will you build?</h1>
+    <p>Choose the place first. The hazards, the advice and the costs all depend on it.</p>
+    <form id="psearch"><input id="pq" placeholder="Search a city or address" aria-label="Search a place"><button>Search</button></form>
+    <ul id="presults"></ul>
+    <div class="lab">Or click the map, or pick a quick place</div>
+    <div id="chips"></div>
+    <div class="lab">Or type the position</div>
+    <div class="coords"><input id="plat" placeholder="Latitude" aria-label="Latitude"><input id="plon" placeholder="Longitude" aria-label="Longitude"></div>
+    <div id="pchosen" class="muted">No place chosen yet. Click the map.</div>
+    <button id="pgo" disabled>Use this place</button>
+    <p class="mapnote" id="mapnote"></p>
+  </div>
+</section>
+
+<section id="s-work" class="work" hidden>
+  <aside class="left">
+    <div class="card" id="st2">
+      <div class="placebar"><div><span class="muted">Place</span><br><b id="placename"></b></div><button class="btn2" id="changeplace">Change place</button></div>
+    </div>
+    <div class="card">
+      <h2>Step 2. What this place faces</h2>
+      <p class="hint">Chosen scenario is shown at the top of the page.</p>
+      <div id="hz"></div>
+      <ul id="sitestatus"></ul>
+      <div id="sitewarn" hidden></div>
+      <div class="row"><button class="btn2" id="retry" type="button">Read the data again</button></div>
+      <details><summary>Correct the site numbers</summary><div id="siteedit"></div></details>
+    </div>
+    <div class="card" id="st3">
+      <h2>Step 3. What are you building?</h2>
+      <div id="tiles"></div>
+      <div id="sizes"></div>
+    </div>
+    <div class="card" id="st4">
+      <h2>Step 4. Design parameters</h2>
+      <p class="hint">Change any choice. The building and every number update at once.</p>
+      <div id="params"></div>
+      <div class="row">
+        <button class="btn" id="applyopt" type="button">Apply the optimized design</button>
+        <button class="btn ghost" id="resetstd" type="button">Back to standard</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div id="viewbox">
+      <canvas id="cv" aria-label="3D view of the building"></canvas>
+      <div id="hud"></div>
+      <div class="vhelp">Drag to turn, scroll or pinch to zoom</div>
+      <div class="vctl"><label><input type="checkbox" id="flood" checked> Show flood</label><label><input type="checkbox" id="auto" checked> Turn slowly</label><button class="btn2" id="resetview" type="button">Reset view</button></div>
+    </div>
+
+    <div class="card" id="st5">
+      <h2>Step 5. Compare the designs</h2>
+      <p class="hint">Standard: the cheapest ordinary choices. Your design: what you set. Optimized: the cheapest total that stays inside the safety cap, found by the engine.</p>
+      <div id="bars"></div>
+      <p id="cmpnote"></p>
+      <table id="cmp"></table>
+    </div>
+    <div class="cols">
+      <div class="card"><h2>Residual risk by hazard</h2><p class="hint">How much risk is left after the design choices.</p><div id="hb"></div></div>
+      <div class="card"><h2>Recommended changes for this place</h2><p class="hint">From the hazards above. Tick means your design already has it.</p><ul id="advice"></ul><div class="row"><button class="btn" id="applyall" type="button">Apply all recommendations</button></div></div>
+      <div class="card"><h2>Long-term performance</h2><p class="hint">Expected yearly loss under each climate scenario.</p><table id="scen"></table></div>
+      <div class="card"><h2>Lender and insurer view</h2><p class="hint">Use before financing or cover is agreed.</p><div id="lender"></div></div>
+    </div>
+    <div class="card disc">
+      <h2>How to read this, and its limits</h2>
+      <p><b>This is a planning aid, not an engineering study.</b> The loss rates, the effect of each design choice and the costs are simple rules of thumb written into the page. They have not been calibrated against real damage records or building simulations. Use the result to compare options and start a conversation, then ask engineers and insurers to confirm.</p>
+      <p><b>The calculation.</b> Each hazard gets an intensity from 0 to 1 from the site numbers. Yearly loss = value at risk × a maximum loss rate × intensity<sup>1.6</sup> × a building-type factor × the effect of each design choice. Total cost over 30 years = construction + adaptation extras + yearly losses and cooling energy added up with a 4% discount. The optimizer changes one choice at a time while the total falls, and refuses designs that break the safety cap.</p>
+      <p><b>The data.</b> Heat, rain and wind come from one climate model (Open-Meteo, MRI-AGCM3-2-S), earthquakes from the USGS catalogue, ground height from a public height model. The distance to the sea is estimated from a ring of heights. Anything that could not be read is marked on the left and replaced by typical values you can correct.</p>
+    </div>
+  </main>
+</section>
+<div id="loading" hidden><div><span class="spin"></span><span id="loadtext">Loading…</span></div></div>
+<script src="/lib/build/three.min.js"></script>
+<script src="/lib/leaflet.js"></script>
+<script src="/lib/build/engine.js"></script>
+<script src="/lib/build/presets.js"></script>
+<script src="/lib/build/app.js"></script>
+</body></html>
