@@ -66,9 +66,10 @@ body[data-sec=coast]{--page:#0a1828;--bg:#09131f;--card:#11253a;--line:#1f4263;-
 body[data-sec=soil]{--page:#14190f;--bg:#10150c;--card:#1d2817;--line:#38502c;--brand:#9bd45f;--brand2:#2a4220;border-top:8px solid #9bd45f}
 body[data-sec=soil] button:not(.alt){color:#10200a}
 body[data-sec] #sub{color:var(--brand);font-weight:600}
-.three{display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:16px}
+.three{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:16px}
 body[data-sec=solar]{--page:#1c1608;--bg:#171207;--card:#2a2110;--line:#5a4519;--brand:#f2b84b;--brand2:#4a3814;border-top:8px solid #f2b84b}
 body[data-sec=solar] button:not(.alt){color:#2a1a00}
+.pick-station{border-top:6px solid #b58cf0}.pick-station button{background:#b58cf0;color:#1c0f30}
 .pick-build{border-top:6px solid #e8845a}.pick-build button{background:#e8845a;color:#2a1000}
 .pick-solar{border-top:6px solid #f2b84b}.pick-solar button{background:#f2b84b;color:#2a1a00}
 .pick-coast{border-top:6px solid #4cc3e0}.pick-soil{border-top:6px solid #9bd45f}.pick-soil button{background:#9bd45f;color:#10200a}
@@ -81,13 +82,14 @@ body[data-sec=solar] button:not(.alt){color:#2a1a00}
 <p class="sub" id="sub">Coastal Area and Soil Trend Detection</p>
 <p class="noprint" id="switchwrap" hidden><button class="alt small" id="switch">Switch section</button></p>
 </header>
-<section id="landing" class="noprint" style="max-width:1280px;margin:24px auto;padding:0 16px">
+<section id="landing" class="noprint" style="max-width:1420px;margin:24px auto;padding:0 16px">
 <h2>What would you like to do?</h2>
 <div class="three">
   <div class="card pick-coast"><h3 style="color:#4cc3e0">Coastal area</h3><p style="font-size:18px;margin:6px 0">Do you want to check a coastal area and assess its risk?</p><p class="muted">See which sea and coast trends are getting worse, why, and what to do about them.</p><button id="go-coast">Check a coastal area</button></div>
   <div class="card pick-soil"><h3 style="color:#9bd45f">Soil</h3><p style="font-size:18px;margin:6px 0">Do you want to find which areas of soil are slowly drying out?</p><p class="muted">See where soil wetness is falling over the years, how fast, and what is behind it.</p><button id="go-soil">Find drying soil</button></div>
   <div class="card pick-solar"><h3 style="color:#f2b84b">Solar radiation and energy</h3><p style="font-size:18px;margin:6px 0">Do you want to see how the sunlight, light for plants and cloud are changing?</p><p class="muted">Checks sunlight, heat sent back down by the air, light for plants, ultraviolet light and cloud, and what they mean for solar power, crops and the sea.</p><button id="go-solar">Check sunlight</button></div>
   <div class="card pick-build"><h3 style="color:#e8845a">Make your next building climate resilient</h3><p style="font-size:18px;margin:6px 0">Do you want to design a building that stands up to the climate of its place?</p><p class="muted">Choose the place, pick a building type, shape it in 3D, and compare the risk and cost of standard, your own and optimized designs.</p><button id="go-build">Design a resilient building</button></div>
+  <div class="card pick-station"><h3 style="color:#b58cf0">Forecasting station</h3><p style="font-size:18px;margin:6px 0">Do you want to know the weather, the chance of rain, heat wave and earthquake, and the damage, up to 2050?</p><p class="muted">Choose a place, a month and a year. See the climate and the monthly chances as line charts, the money damage for your building, and train the damage model with your own csv.</p><button id="go-station">Open the forecasting station</button></div>
 </div>
 </section>
 <main id="app" hidden>
@@ -531,7 +533,7 @@ async function start(){
   const iso=d=>d.toISOString().slice(0,10),end=new Date(Date.now()-6*864e5),beg=new Date(end.getTime()-59*864e5);$("d0").value=iso(beg);$("d1").value=iso(end);$("d1").max=iso(end);
   const tog=()=>{const dm=modeNow()==="day";$("daybox").hidden=!dm;$("monthbox").hidden=dm};document.querySelectorAll("input[name=mode]").forEach(x=>x.onchange=tog);tog();
   renderChips();
-  $("go-coast").onclick=()=>setDomain("coast");$("go-soil").onclick=()=>setDomain("soil");$("go-solar").onclick=()=>setDomain("solar");$("go-build").onclick=()=>{location.href="/build"};
+  $("go-coast").onclick=()=>setDomain("coast");$("go-soil").onclick=()=>setDomain("soil");$("go-solar").onclick=()=>setDomain("solar");$("go-build").onclick=()=>{location.href="/build"};$("go-station").onclick=()=>{location.href="/station"};
   $("switch").onclick=()=>{$("app").hidden=true;delete document.body.dataset.sec;$("landing").hidden=false;$("switchwrap").hidden=true;$("sub").textContent="Coastal Area and Soil Trend Detection"};
 }
 start().catch(e=>{$("status").textContent="Could not start: "+e.message});

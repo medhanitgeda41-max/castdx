@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """CASTD, Coastal Area and Soil Trend Detection: choose the coast section or the soil section, pick places on a map, choose measures, and see which ones are changing, whether the change is significant, the long-term outlook and what to do.
 
-    python trend_app.py            starts http://127.0.0.1:9036 and opens it in your browser
+    python trend_app.py            starts http://127.0.0.1:9037 and opens it in your browser
 
 Data: NASA POWER (power.larc.nasa.gov), 1981 to the last full year, plus optional NOAA, PSMSL and Open-Meteo sea data (ocean.py). Statistics: stats.py (regression + t-test, Mann-Kendall, Theil-Sen with 95% interval).
 """
@@ -19,7 +19,7 @@ import webbrowser
 from datetime import date
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 BASE = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 sys.path.insert(0, str(BASE))
@@ -30,11 +30,12 @@ import events       # noqa: E402
 import coast        # noqa: E402
 import soil         # noqa: E402
 import solar        # noqa: E402
+import station      # noqa: E402
 import ocean        # noqa: E402
 import stats        # noqa: E402
 import trends       # noqa: E402
 
-DEFAULT_PORT = 9036             # changed on every new release so an older copy still running does not answer instead
+DEFAULT_PORT = 9037             # changed on every new release so an older copy still running does not answer instead
 GETTER = trends.get_json        # tests replace this
 
 
@@ -185,6 +186,16 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, (BASE / "web" / "index.html").read_bytes(), "text/html; charset=utf-8")
             elif p in ("/build", "/build.html"):
                 self._send(200, (BASE / "web" / "build.html").read_bytes(), "text/html; charset=utf-8")
+            elif p in ("/station", "/station.html"):
+                self._send(200, (BASE / "web" / "station.html").read_bytes(), "text/html; charset=utf-8")
+            elif p == "/api/station/job":
+                self._json(station.job_state(parse_qs(urlparse(self.path).query).get("id", [""])[0]))
+            elif p == "/api/station/model":
+                self._json(station.model_state())
+            elif p == "/api/station/template":
+                self._send(200, station.template_csv(), "text/csv; charset=utf-8", {"Content-Disposition": "attachment; filename=castd_training_template.csv"})
+            elif p == "/api/station/sample":
+                self._send(200, station.sample_csv(), "text/csv; charset=utf-8", {"Content-Disposition": "attachment; filename=castd_training_sample_augmented.csv"})
             elif p == "/api/config":
                 self._json(api_config())
             elif p.startswith("/lib/"):
@@ -208,6 +219,12 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(_causes(body))
             elif p == "/api/calendar":
                 self._json(_calendar(body))
+            elif p == "/api/station/run":
+                self._json(station.run_forecast(body))
+            elif p == "/api/station/train":
+                self._json(station.train(body))
+            elif p == "/api/station/reset":
+                self._json(station.reset_model())
             elif p == "/api/risk":
                 self._json(_risk(body))
             elif p == "/api/projection":

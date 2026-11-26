@@ -1,7 +1,7 @@
 CASTD: Coastal Area and Soil Trend Detection (NASA Space Apps Challenge, Earth science trends)
 
-Run: install Python (tick "Add to PATH"), double-click run.bat. Opens http://127.0.0.1:9036
-This release uses port 9036 (every release uses a new port).
+Run: install Python (tick "Add to PATH"), double-click run.bat. Opens http://127.0.0.1:9037
+This release uses port 9037 (every release uses a new port).
 
 Two separate sections. The start screen asks which one you want:
   1. Coastal section: "Do you want to check a coastal area and assess its risk?"
@@ -41,7 +41,7 @@ Climate model projection (inside the long-term outlook)
   Soil water exists in only 2 of the 7 models (the page says so). The models have no sea temperature, sea level or waves.
   These are projections, not forecasts. The models end in 2050. NOT TESTED LIVE: tested on simulated answers only.
 
-Solar radiation and combined risk (port 9036)
+Solar radiation and combined risk (port 9037)
   New third section "Solar radiation and energy": sunlight (all sky and clear sky), sunlight blocked by clouds (worked out here), heat radiated down by the air,
   light for plants, ultraviolet index and cloud, all from NASA POWER. Alerts are plain-word and depend on use (solar power, crops, sea).
   Soil causes now also test evaporation (EVLAND), plant transpiration (EVPTRNS) and top-layer soil temperature (TSOIL1).
@@ -49,9 +49,17 @@ Solar radiation and combined risk (port 9036)
   NOT TESTED WITH NASA: tested only on simulated data. Not checked live: that POWER monthly really returns EVLAND, EVPTRNS, TSOIL1 and the ultraviolet index at every place, and their units.
   Left out on purpose: SFMC, RZMC, PRMC and the percentile versions (not standard POWER monthly parameters; the wetness fractions already cover them), TSOIL2 to TSOIL6, longwave/clear-sky longwave and the evapotranspiration total (evaporation and transpiration are shown separately).
 
-Make your next building climate resilient (new section, port 9036)
+Make your next building climate resilient (new section, port 9037)
 - A fourth card on the first screen opens /build. It is its own page; the "CASTD" button at the top goes back.
 - Choose the place first, then the building type, then shape it in 3D with sliders and buttons. It compares a standard, your own and an optimized design (cost, yearly loss, residual risk, lender grade).
 - Live data is read by the browser directly: Open-Meteo (climate model, ground height, place search), USGS (earthquakes), OpenStreetMap map tiles. If one cannot be read, typical values are used and it says so. No key or secret is needed.
 - Not tested live: only tested with simulated answers. The loss rates and costs are simple rules of thumb, not engineering results.
 - Files: web/build.html and web/lib/build/ (engine.js, presets.js, app.js, style.css, three.min.js).
+
+Forecasting station (fifth card, port 9037)
+- Opens /station. Choose a place, a month and a year up to 2050 (a period of at most 25 years), describe the building (value, materials, protection).
+- Shows: the climate for each month (hottest temperature, rain, size of heavy rain and heat wave events), the chance each month of a flood-causing heavy rain day, a heat wave and an earthquake (line charts), and the money damage each month (line chart), with and without protection, plus advice.
+- Built from the RASD Climate Map engine (folder rasd_core). Data: Open-Meteo (30 years of weather, five climate models to 2050, ground height), USGS (earthquakes), OpenStreetMap coastline file included. No key or secret is needed.
+- Train the damage model: on the same page, upload your own csv (template and a 9,000-row sample can be downloaded there). The built-in model learned from AUGMENTED (made-up) data that follows the RASD rules, not from real repair bills. The trained model is saved on the server and is shared by every visitor until it is reset or the site restarts.
+- A lookup downloads a lot the first time (a minute or two); the same place is quick afterwards. Cached files go in the home folder (.rasd_prob_cache).
+- Not tested live: only tested with simulated Open-Meteo and USGS answers. The chances and damages are model results, not forecasts.

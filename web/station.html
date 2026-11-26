@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CASTD: Forecasting station</title>
+<link rel="stylesheet" href="/lib/leaflet.css">
+<style>
+:root{--bg:#0f1923;--card:#17232f;--line:#2a3a49;--ink:#e6edf3;--mut:#93a8b8;--flood:#4cc3e0;--heat:#f2842f;--quake:#b58cf0;--tot:#f4f7fa;--acc:#7bd88f;--bad:#ff7a6b}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+a{color:var(--flood)}
+header{display:flex;align-items:center;gap:16px;padding:12px 20px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+header h1{margin:0;font-size:18px}header small{display:block;color:var(--mut);font-weight:400;font-size:13px}
+.back{border:1px solid var(--line);border-radius:8px;padding:6px 12px;text-decoration:none;color:var(--ink);font-size:14px}
+main{max-width:1180px;margin:0 auto;padding:18px 16px 60px;display:flex;flex-direction:column;gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.card h2{margin:0 0 4px;font-size:17px}.hint{margin:0 0 12px;color:var(--mut);font-size:13.5px}
+button{font:inherit;cursor:pointer;border:0;border-radius:8px;padding:9px 16px;background:var(--flood);color:#06222a;font-weight:700}
+button.alt{background:#243546;color:var(--ink);font-weight:500;border:1px solid var(--line)}
+button:disabled{opacity:.45;cursor:not-allowed}
+input,select{font:inherit;color:var(--ink);background:#0f1a24;border:1px solid var(--line);border-radius:7px;padding:7px 9px;min-width:0}
+label{display:flex;flex-direction:column;gap:3px;font-size:13px;color:var(--mut)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.grid5{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.two{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px}
+@media(max-width:900px){.two{grid-template-columns:1fr}}
+#pmap{height:340px;border-radius:10px;background:#1e2d3a}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.chip{background:#1e2d3a;border:1px solid var(--line);color:var(--ink);border-radius:999px;padding:4px 11px;font-size:13px;font-weight:400}
+#results-list{list-style:none;margin:6px 0 0;padding:0}
+#results-list button{display:block;width:100%;text-align:left;background:#1e2d3a;color:var(--ink);font-weight:400;margin-top:4px;border:1px solid var(--line)}
+#chosen{margin:10px 0;padding:10px;border-radius:8px;background:#0f1a24;min-height:44px}
+.stat{background:#0f1a24;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.stat b{display:block;font-size:20px}.stat span{color:var(--mut);font-size:12.5px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:8px 0 4px}
+.good{color:var(--acc)}.bad{color:var(--bad)}
+.rate{display:inline-block;padding:2px 10px;border-radius:999px;font-weight:700;color:#10200a}
+.r0{background:#7bd88f}.r1{background:#f1c75a}.r2{background:#ff7a6b}
+.chart{position:relative}
+.chart svg{width:100%;height:auto;display:block}
+.tip{position:absolute;pointer-events:none;background:#0b131b;border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:12.5px;white-space:nowrap;display:none;z-index:5}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:13px;color:var(--mut);margin:6px 0 0}.legend i{display:inline-block;width:18px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.note{color:var(--mut);font-size:13px}
+.warn{background:#2a1f1b;border:1px solid #5a3b30;border-radius:8px;padding:8px 12px;font-size:13.5px;margin:6px 0}
+ul.reco{margin:6px 0 0;padding-left:20px}
+#prog{padding:12px 14px;border-radius:8px;background:#0f1a24;display:flex;gap:12px;align-items:center}
+.spin{width:16px;height:16px;border:3px solid #34495b;border-top-color:var(--flood);border-radius:50%;animation:sp 1s linear infinite;flex:none}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.spin{animation:none}}
+table{border-collapse:collapse;width:100%;font-size:13.5px}th,td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:right}th:first-child,td:first-child{text-align:left}
+.scroll{max-height:320px;overflow:auto}
+[hidden]{display:none!important}
+:focus-visible{outline:3px solid #f0b429;outline-offset:2px}
+</style></head>
+<body>
+<header>
+  <a class="back" href="/">&larr; CASTD</a>
+  <h1>Forecasting station<small>Choose a place and a period up to 2050. See the climate, the chance of heavy rain, heat wave and earthquake, and the damage.</small></h1>
+</header>
+<main>
+  <section class="card">
+    <h2>Step 1. Choose the place</h2>
+    <p class="hint">Search, click the map, or pick a quick place.</p>
+    <div class="two">
+      <div id="pmap"></div>
+      <div>
+        <form id="sf" class="row"><label style="flex:1">Search a city or address<input id="q" placeholder="For example Dubai"></label><button class="alt" type="submit">Search</button></form>
+        <ul id="results-list"></ul>
+        <div class="chips" id="chips"></div>
+        <div class="row"><label style="flex:1">Latitude<input id="lat" inputmode="decimal"></label><label style="flex:1">Longitude<input id="lon" inputmode="decimal"></label></div>
+        <div id="chosen" class="note">No place chosen yet. Click the map.</div>
+        <p class="note" id="mapnote" style="color:var(--bad)"></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Step 2. Choose the period and describe the building</h2>
+    <p class="hint">The period can start this month or later and end by December 2050 (at most 25 years). The building decides how much damage the same weather causes.</p>
+    <div class="row">
+      <label>From month<select id="m0"></select></label><label>From year<select id="y0"></select></label>
+      <label>To month<select id="m1"></select></label><label>To year<select id="y1"></select></label>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <label>Building value<input id="value" type="number" min="1" value="2000000" style="width:150px"></label>
+      <label>Currency name<input id="cur" value="AED" maxlength="5" style="width:80px"></label>
+    </div>
+    <p class="note" style="margin:12px 0 4px">What is it made of? Percentages of the building (they are scaled to 100 if they do not add up).</p>
+    <div class="grid5" id="mix"></div>
+    <p class="note" style="margin:12px 0 4px">How well is it protected? 0 means nothing was done, 100 means everything possible was done.</p>
+    <div class="grid5" id="adapt"></div>
+    <details style="margin-top:10px"><summary class="note" style="cursor:pointer">Settings for your part of the world</summary>
+      <div class="row" style="margin-top:8px"><label>A heavy rain day is at least (millimetres)<input id="rainmm" type="number" min="1" max="500" value="20" style="width:110px"></label>
+      <label>A hot day is at least (degrees Celsius)<input id="heatc" type="number" min="10" max="60" value="40" style="width:110px"></label></div>
+      <p class="note">Flood chance = chance of a day with at least this much rain in the month. Heat wave chance = chance of three hot days in a row.</p></details>
+    <div class="row" style="margin-top:14px"><button id="run" disabled>Find the climate, chances and damage</button></div>
+    <div id="prog" hidden style="margin-top:12px"><div class="spin"></div><div id="progtext">Starting...</div></div>
+    <div id="err" class="warn" hidden></div>
+  </section>
+
+  <section id="res" hidden class="card">
+    <h2 id="rtitle">Results</h2>
+    <p class="hint" id="rsub"></p>
+    <div id="notes"></div>
+    <div class="stats" id="stats"></div>
+    <h3 style="margin:18px 0 2px;font-size:15px">Place facts</h3>
+    <div class="stats" id="facts"></div>
+
+    <h3 style="margin:22px 0 2px;font-size:15px">Chance each month</h3>
+    <p class="note" style="margin:0 0 6px">Chance that the month has a flood-causing heavy rain day, a heat wave, or a main earthquake.</p>
+    <div class="chart" id="c1"></div><div class="legend" id="l1"></div>
+
+    <h3 style="margin:22px 0 2px;font-size:15px">Climate data each month</h3>
+    <div class="two"><div><p class="note" style="margin:0 0 4px">Average hottest temperature of the day (degrees Celsius)</p><div class="chart" id="c2"></div></div>
+    <div><p class="note" style="margin:0 0 4px">Rain in the month (millimetres)</p><div class="chart" id="c3"></div></div></div>
+    <div class="two" style="margin-top:12px"><div><p class="note" style="margin:0 0 4px">Size of a typical heavy rain day and heat wave peak</p><div class="chart" id="c4"></div><div class="legend" id="l4"></div></div>
+    <div><p class="note" style="margin:0 0 4px">Damage each month (in <span class="cur"></span>)</p><div class="chart" id="c5"></div><div class="legend" id="l5"></div></div></div>
+
+    <h3 style="margin:22px 0 2px;font-size:15px">What to do</h3>
+    <ul class="reco" id="reco"></ul>
+    <div class="row" style="margin-top:14px"><button class="alt" id="csv">Download the monthly table (csv)</button></div>
+    <details style="margin-top:12px"><summary class="note" style="cursor:pointer">Show the monthly table</summary><div class="scroll"><table id="tbl"></table></div></details>
+  </section>
+
+  <section class="card">
+    <h2>Train the damage model with your own csv</h2>
+    <p class="hint">The damage money comes from a trained model. The built-in one learned from made-up data that follows the RASD rules, not from real repair bills. Upload your own records to train it again.</p>
+    <p id="minfo" class="note"></p>
+    <div class="row">
+      <label>Your csv file<input type="file" id="file" accept=".csv,text/csv"></label>
+      <button id="train" disabled>Train the model</button>
+      <button class="alt" id="reset">Go back to the built-in model</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <a href="/api/station/template" class="note">Download the training template (one row per building and month)</a>
+      <a href="/api/station/sample" class="note">Download the sample training file (9,000 made-up rows)</a>
+    </div>
+    <p class="note">The template needs: latitude, longitude, month, year, the five material percentages, building value, the three protection percentages and the damage recovery money paid. At least <span id="minrows">200</span> rows. The sample file shows the ready format that already holds the chances.</p>
+    <div id="tprog" class="note" style="margin-top:8px"></div>
+    <p class="note">Note: on a shared website the trained model is shared by everyone who uses the site, until it is reset or the site restarts.</p>
+  </section>
+</main>
+
+<script src="/lib/leaflet.js"></script>
+<script>
+(function(){
+"use strict";
+var $=function(s){return document.querySelector(s)};
+var MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+var MATS=[["steel","Steel",30],["concrete","Concrete",60],["masonry","Masonry or brick",10],["timber","Timber or wood",0],["other","Other",0]];
+var HZ=[["flood","Flood protection"],["heat","Heat protection"],["quake","Earthquake protection"]];
+var COL={flood:"#4cc3e0",heat:"#f2842f",quake:"#b58cf0",total:"#f4f7fa",none:"#8fa3b3"};
+var PRESETS=[["Dubai, UAE",25.2048,55.2708],["Abu Dhabi, UAE",24.4539,54.3773],["Riyadh, Saudi Arabia",24.7136,46.6753],["Miami, USA",25.7617,-80.1918],["Mumbai, India",19.076,72.8777],["Rotterdam, Netherlands",51.9244,4.4777],["Lagos, Nigeria",6.5244,3.3792],["Tokyo, Japan",35.6762,139.6503]];
+var picked=null,map=null,marker=null,mapOK=false,LAST=null;
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function fmt(x){var c=$("#cur").value.trim();return (c?c+" ":"")+Math.round(x).toLocaleString("en-US")}
+function pct(x,n){return (x*100).toFixed(n==null?1:n)+"%"}
+
+// ---------- place
+function initMap(){
+  try{
+    map=L.map("pmap",{zoomControl:false}).setView([25.2,55.27],4);
+    var layer=L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:18,attribution:"© OpenStreetMap contributors"}).addTo(map);
+    L.control.zoom({position:"bottomright"}).addTo(map);
+    var bad=0;layer.on("tileerror",function(){if(++bad===4)$("#mapnote").textContent="The map pictures could not load. You can still search, use a quick place, or type latitude and longitude."});
+    map.on("click",function(e){pick(e.latlng.lat,e.latlng.lng,"Chosen point")});mapOK=true;
+  }catch(e){$("#mapnote").textContent="The map could not start. Search, use a quick place, or type latitude and longitude."}
+}
+function pick(lat,lon,name,fly){
+  picked={lat:+lat,lon:+lon,name:name};
+  if(mapOK){if(marker)marker.setLatLng([lat,lon]);else marker=L.circleMarker([lat,lon],{radius:9,color:"#06222a",weight:3,fillColor:"#f2842f",fillOpacity:1}).addTo(map);if(fly)map.setView([lat,lon],Math.max(map.getZoom(),8))}
+  $("#chosen").innerHTML="<b>"+esc(name)+"</b><br>"+(+lat).toFixed(4)+", "+(+lon).toFixed(4);
+  $("#lat").value=(+lat).toFixed(4);$("#lon").value=(+lon).toFixed(4);$("#run").disabled=false;
+}
+function fillChips(){PRESETS.forEach(function(p){var b=document.createElement("button");b.type="button";b.className="chip";b.textContent=p[0];b.onclick=function(){pick(p[1],p[2],p[0],true)};$("#chips").appendChild(b)})}
+$("#sf").onsubmit=function(ev){
+  ev.preventDefault();var q=$("#q").value.trim();if(!q)return;var ul=$("#results-list");ul.innerHTML="<li class='note'>Searching...</li>";
+  fetch("https://geocoding-api.open-meteo.com/v1/search?count=6&language=en&format=json&name="+encodeURIComponent(q)).then(function(r){return r.json()}).then(function(d){
+    ul.innerHTML="";var rs=d.results||[];if(!rs.length){ul.innerHTML="<li class='note'>No place found. Try another spelling or click the map.</li>";return}
+    rs.forEach(function(x){var li=document.createElement("li"),b=document.createElement("button");b.type="button";b.textContent=[x.name,x.admin1,x.country].filter(Boolean).join(", ");b.onclick=function(){pick(x.latitude,x.longitude,b.textContent,true);ul.innerHTML=""};li.appendChild(b);ul.appendChild(li)});
+  }).catch(function(){ul.innerHTML="<li class='note'>Search could not be reached. Use a quick place, click the map, or type latitude and longitude.</li>"});
+};
+function fromBoxes(){var la=parseFloat($("#lat").value),lo=parseFloat($("#lon").value);if(isFinite(la)&&isFinite(lo)&&Math.abs(la)<=90&&Math.abs(lo)<=180)pick(la,lo,"Typed point",true)}
+$("#lat").onchange=$("#lon").onchange=fromBoxes;
+
+// ---------- inputs
+function init(){
+  var now=new Date(),cy=now.getFullYear(),cm=now.getMonth()+1;
+  ["m0","m1"].forEach(function(id){MONTHS.forEach(function(m,i){var o=document.createElement("option");o.value=i+1;o.textContent=m;$("#"+id).appendChild(o)})});
+  ["y0","y1"].forEach(function(id){for(var y=cy;y<=2050;y++){var o=document.createElement("option");o.value=y;o.textContent=y;$("#"+id).appendChild(o)}});
+  $("#m0").value=cm;$("#y0").value=cy;var ey=Math.min(2050,cy+2);$("#y1").value=ey;$("#m1").value=cm===1?12:cm-1;if(cm===1)$("#y1").value=Math.min(2050,cy+1);
+  MATS.forEach(function(m){var l=document.createElement("label");l.innerHTML=m[1]+" (percent)<input type='number' min='0' max='100' value='"+m[2]+"' data-m='"+m[0]+"'>";$("#mix").appendChild(l)});
+  HZ.forEach(function(h){var l=document.createElement("label");l.innerHTML=h[1]+" (0 to 100)<input type='number' min='0' max='100' value='0' data-h='"+h[0]+"'>";$("#adapt").appendChild(l)});
+  fillChips();initMap();modelState();
+}
+function body(){
+  var mix={},ad={};document.querySelectorAll("#mix input").forEach(function(i){mix[i.dataset.m]=+i.value||0});document.querySelectorAll("#adapt input").forEach(function(i){ad[i.dataset.h]=+i.value||0});
+  return{lat:picked.lat,lon:picked.lon,from_y:+$("#y0").value,from_m:+$("#m0").value,to_y:+$("#y1").value,to_m:+$("#m1").value,value:+$("#value").value||1,currency:$("#cur").value,mix:mix,adapt:ad,rain_mm:+$("#rainmm").value||20,heat_c:+$("#heatc").value||40};
+}
+function post(u,b){return fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)}).then(function(r){return r.json().then(function(j){if(!r.ok||j.error)throw new Error(j.error||("The server answered "+r.status));return j})})}
+function get(u){return fetch(u).then(function(r){return r.json().then(function(j){if(!r.ok||j.error)throw new Error(j.error||("The server answered "+r.status));return j})})}
+
+$("#run").onclick=function(){
+  if(!picked)return;$("#err").hidden=true;$("#run").disabled=true;$("#prog").hidden=false;$("#progtext").textContent="Starting...";
+  post("/api/station/run",body()).then(function(j){poll(j.job)}).catch(fail);
+};
+function fail(e){$("#prog").hidden=true;$("#run").disabled=false;$("#err").hidden=false;$("#err").textContent=e.message||String(e)}
+function poll(id){
+  get("/api/station/job?id="+encodeURIComponent(id)).then(function(s){
+    if(!s.done){$("#progtext").textContent=s.status||"Working...";setTimeout(function(){poll(id)},1500);return}
+    $("#prog").hidden=true;$("#run").disabled=false;
+    if(s.error){fail(new Error(s.error));return}
+    show(s.result);
+  }).catch(fail);
+}
+
+// ---------- charts
+function lineChart(el,labels,series,o){
+  o=o||{};var W=o.w||560,H=240,L=54,R=10,T=10,B=28,n=labels.length,cw=W-L-R,ch=H-T-B;
+  var vals=[];series.forEach(function(s){s.v.forEach(function(x){if(x!=null&&isFinite(x))vals.push(x)})});
+  var lo=o.min!=null?o.min:Math.min.apply(null,vals.concat([0])),hi=o.max!=null?o.max:Math.max.apply(null,vals.concat([o.floor||0.0001]));
+  if(o.min==null&&lo>0&&o.free)lo=Math.min.apply(null,vals)-1;
+  if(hi<=lo)hi=lo+1;var pad=(hi-lo)*0.06;if(o.max==null)hi+=pad;if(o.min==null&&lo<0)lo-=pad;
+  var X=function(i){return L+(n===1?cw/2:i*cw/(n-1))},Y=function(v){return T+ch-(v-lo)/(hi-lo)*ch};
+  var g="",ticks=5;
+  for(var k=0;k<=ticks;k++){var v=lo+(hi-lo)*k/ticks,y=Y(v);g+="<line x1='"+L+"' x2='"+(W-R)+"' y1='"+y+"' y2='"+y+"' stroke='#2a3a49' stroke-width='1'/><text x='"+(L-6)+"' y='"+(y+4)+"' text-anchor='end' fill='#93a8b8' font-size='11'>"+(o.fmt?o.fmt(v):Math.round(v*10)/10)+"</text>"}
+  var step=Math.max(1,Math.ceil(n/8)),lastY="";
+  labels.forEach(function(lb,i){var yr=lb.y,mo=lb.m,tx=null;
+    if(n<=14)tx=MONTHS[mo-1].slice(0,3)+(mo===1||i===0?" "+yr:"");
+    else if(mo===1)tx=String(yr);
+    else if(i===0){var nj=labels.findIndex(function(z){return z.m===1});if(nj<0||nj>3)tx=MONTHS[mo-1].slice(0,3)+" "+yr}
+    if(tx)g+="<text x='"+X(i)+"' y='"+(H-8)+"' text-anchor='middle' fill='#93a8b8' font-size='11'>"+tx+"</text>"});
+  series.forEach(function(s){
+    var d="",pen=false;s.v.forEach(function(x,i){if(x==null||!isFinite(x)){pen=false;return}d+=(pen?"L":"M")+X(i).toFixed(1)+" "+Y(x).toFixed(1)+" ";pen=true});
+    g+="<path d='"+d+"' fill='none' stroke='"+s.c+"' stroke-width='"+(s.w||2.2)+"' "+(s.dash?"stroke-dasharray='5 4'":"")+" stroke-linejoin='round'/>";
+    if(n<=40)s.v.forEach(function(x,i){if(x!=null&&isFinite(x))g+="<circle cx='"+X(i)+"' cy='"+Y(x)+"' r='2.4' fill='"+s.c+"'/>"});
+  });
+  g+="<line class='cx' x1='0' x2='0' y1='"+T+"' y2='"+(T+ch)+"' stroke='#93a8b8' stroke-width='1' style='display:none'/>";
+  el.innerHTML="<svg viewBox='0 0 "+W+" "+H+"' role='img' aria-label='"+esc(o.label||"Line chart")+"'>"+g+"</svg><div class='tip'></div>";
+  var svg=el.querySelector("svg"),tip=el.querySelector(".tip"),cx=el.querySelector(".cx");
+  svg.onmousemove=function(ev){var r=svg.getBoundingClientRect(),px=(ev.clientX-r.left)/r.width*W;var i=Math.round((px-L)/cw*(n-1));if(n===1)i=0;i=Math.max(0,Math.min(n-1,i));
+    cx.setAttribute("x1",X(i));cx.setAttribute("x2",X(i));cx.style.display="";
+    tip.innerHTML="<b>"+MONTHS[labels[i].m-1]+" "+labels[i].y+"</b><br>"+series.map(function(s){var v=s.v[i];return "<span style='color:"+s.c+"'>&#9632;</span> "+esc(s.name)+": "+(v==null?"no data":(o.tfmt?o.tfmt(v):Math.round(v*100)/100))}).join("<br>");
+    tip.style.display="block";var er=el.getBoundingClientRect(),left=ev.clientX-er.left+14;if(left>er.width-170)left=ev.clientX-er.left-190;tip.style.left=left+"px";tip.style.top=(ev.clientY-er.top+8)+"px"};
+  svg.onmouseleave=function(){tip.style.display="none";cx.style.display="none"};
+}
+function legend(el,series){el.innerHTML=series.map(function(s){return "<span><i style='background:"+s.c+"'></i>"+esc(s.name)+"</span>"}).join("")}
+
+// ---------- results
+function show(R){
+  LAST=R;$("#res").hidden=false;document.querySelectorAll(".cur").forEach(function(e){e.textContent=R.currency||"money"});
+  var f=R.facts,first=R.months[0],last=R.months[R.months.length-1];
+  $("#rtitle").textContent="Results for "+(picked?picked.name:"the place");
+  $("#rsub").textContent=first.label+" to "+last.label+" ("+R.n+" months). "+(R.future_note||"");
+  var notes=R.notes.slice();if(R.synthetic)notes.push("The damage money model was trained on made-up data that follows the RASD rules, not on real repair bills. Treat the money as a guide. Train it with your own csv below.");
+  notes.push("These are model results, not forecasts. The future comes from climate models under a high-emissions path.");
+  $("#notes").innerHTML=notes.map(function(n){return "<div class='warn'>"+esc(n)+"</div>"}).join("");
+  var rc=R.rating==="Lower risk"?"r0":R.rating==="Medium risk"?"r1":"r2";
+  $("#stats").innerHTML=
+   "<div class='stat'><b>"+fmt(R.total)+"</b><span>Expected damage over the period ("+pct(R.total/R.value,2)+" of the value)</span></div>"+
+   "<div class='stat'><b>"+fmt(R.no_protection)+"</b><span>The same period with no protection</span></div>"+
+   "<div class='stat'><b class='good'>"+fmt(R.saved)+"</b><span>Saved by the protection you described</span></div>"+
+   "<div class='stat'><b><span class='rate "+rc+"'>"+esc(R.rating)+"</span></b><span>About "+R.yearly_pct.toFixed(2)+"% of the value lost each year</span></div>"+
+   "<div class='stat'><b>"+esc(R.worst)+"</b><span>Month with the most expected damage</span></div>"+
+   "<div class='stat'><b>"+pct(R.chances.flood,0)+" / "+pct(R.chances.heat,0)+" / "+pct(R.chances.quake,0)+"</b><span>Chance of at least one heavy rain day / heat wave / earthquake in the period</span></div>";
+  var q=function(v,u,d){return v==null?"not known":(typeof v==="number"?v.toFixed(d==null?0:d):v)+(u||"")};
+  $("#facts").innerHTML=
+   "<div class='stat'><b>"+q(f.elevation_m,"m",0)+"</b><span>Ground height</span></div>"+
+   "<div class='stat'><b>"+(f.coast_km==null?"far from the sea":q(f.coast_km," km",1))+"</b><span>Distance to the sea</span></div>"+
+   "<div class='stat'><b>"+q(f.heavy_days_year,"",1)+"</b><span>Heavy rain days a year ("+esc(f.years)+")</span></div>"+
+   "<div class='stat'><b>"+q(f.hot_days_year,"",0)+"</b><span>Hot days a year</span></div>"+
+   "<div class='stat'><b>"+q(f.max_rain_mm," mm",0)+"</b><span>Wettest day on record"+(f.max_rain_date?" ("+esc(f.max_rain_date)+")":"")+"</span></div>"+
+   "<div class='stat'><b>"+q(f.hottest_c," degrees",1)+"</b><span>Hottest day on record"+(f.hottest_date?" ("+esc(f.hottest_date)+")":"")+"</span></div>"+
+   "<div class='stat'><b>"+q(f.quakes_near,"",0)+"</b><span>Earthquakes of size "+4.5+"+ within "+f.quake_radius_km+" km since "+f.quake_since+"</span></div>"+
+   "<div class='stat'><b>"+q(f.biggest_quake,"",1)+"</b><span>Biggest of them</span></div>";
+  var lb=R.months.map(function(x){return{y:x.y,m:x.m}});
+  var s1=[{name:"Heavy rain (flood)",c:COL.flood,v:R.months.map(function(x){return x.p.flood*100})},{name:"Heat wave",c:COL.heat,v:R.months.map(function(x){return x.p.heat*100})},{name:"Earthquake",c:COL.quake,v:R.months.map(function(x){return x.p.quake*100})}];
+  lineChart($("#c1"),lb,s1,{min:0,max:100,fmt:function(v){return Math.round(v)+"%"},tfmt:function(v){return v.toFixed(1)+"%"},label:"Chance each month"});legend($("#l1"),s1);
+  lineChart($("#c2"),lb,[{name:"Average hottest temperature",c:COL.heat,v:R.months.map(function(x){return x.clim.tmax})}],{w:400,free:true,fmt:function(v){return Math.round(v)},tfmt:function(v){return v.toFixed(1)+" degrees"},label:"Temperature"});
+  lineChart($("#c3"),lb,[{name:"Rain in the month",c:COL.flood,v:R.months.map(function(x){return x.clim.rain})}],{w:400,min:0,floor:5,tfmt:function(v){return v.toFixed(1)+" mm"},label:"Rain"});
+  var s4=[{name:"Heavy rain day (millimetres)",c:COL.flood,v:R.months.map(function(x){return x.clim.rain_peak})},{name:"Heat wave peak (degrees)",c:COL.heat,v:R.months.map(function(x){return x.clim.heat_peak})}];
+  lineChart($("#c4"),lb,s4,{w:400,free:true,min:0,tfmt:function(v){return v.toFixed(1)},label:"Event size"});legend($("#l4"),s4);
+  var s5=[{name:"Flood",c:COL.flood,v:R.months.map(function(x){return x.dmg.flood})},{name:"Heat",c:COL.heat,v:R.months.map(function(x){return x.dmg.heat})},{name:"Earthquake",c:COL.quake,v:R.months.map(function(x){return x.dmg.quake})},{name:"Total",c:COL.total,v:R.months.map(function(x){return x.total}),w:3},{name:"Total with no protection",c:COL.none,dash:true,v:R.months.map(function(x){return x.none})}];
+  lineChart($("#c5"),lb,s5,{w:400,min:0,fmt:function(v){return v>=1e6?(v/1e6).toFixed(1)+"M":v>=1e3?Math.round(v/1e3)+"K":Math.round(v)},tfmt:function(v){return fmt(v)},label:"Damage each month"});legend($("#l5"),s5);
+  $("#reco").innerHTML=R.recommendations.map(function(t){return "<li>"+esc(t)+"</li>"}).join("");
+  $("#tbl").innerHTML="<thead><tr><th>Month</th><th>Hottest temperature</th><th>Rain</th><th>Heavy rain chance</th><th>Heat wave chance</th><th>Earthquake chance</th><th>Damage</th></tr></thead><tbody>"+R.months.map(function(x){return "<tr><td>"+esc(x.label)+"</td><td>"+(x.clim.tmax==null?"":x.clim.tmax.toFixed(1))+"</td><td>"+x.clim.rain.toFixed(1)+"</td><td>"+pct(x.p.flood)+"</td><td>"+pct(x.p.heat)+"</td><td>"+pct(x.p.quake)+"</td><td>"+fmt(x.total)+"</td></tr>"}).join("")+"</tbody>";
+  $("#res").scrollIntoView({behavior:"smooth",block:"start"});
+}
+$("#csv").onclick=function(){
+  if(!LAST)return;var rows=[["month","year","average_hottest_temperature_c","rain_mm","heavy_rain_day_mm","heat_wave_peak_c","earthquake_size","chance_heavy_rain_percent","chance_heat_wave_percent","chance_earthquake_percent","damage_flood","damage_heat","damage_earthquake","damage_total","damage_with_no_protection"]];
+  var r1=function(v,n){return v==null?"":v.toFixed(n==null?1:n)};
+  LAST.months.forEach(function(x){var c=x.clim;rows.push([MONTHS[x.m-1],x.y,r1(c.tmax),r1(c.rain),r1(c.rain_peak),r1(c.heat_peak),r1(c.quake_mag,2),r1(x.p.flood*100,2),r1(x.p.heat*100,2),r1(x.p.quake*100,2),Math.round(x.dmg.flood),Math.round(x.dmg.heat),Math.round(x.dmg.quake),Math.round(x.total),Math.round(x.none)])});
+  var blob=new Blob(["﻿"+rows.map(function(r){return r.join(",")}).join("\n")],{type:"text/csv"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="castd_forecast_station.csv";document.body.appendChild(a);a.click();setTimeout(function(){a.remove()},500);
+};
+
+// ---------- training
+var pollT=null;
+function modelState(){
+  get("/api/station/model").then(function(s){
+    $("#minfo").textContent=s.model;$("#minrows").textContent=s.min_rows;
+    var t=$("#tprog");t.textContent=s.error?("Problem: "+s.error):s.busy?(s.status||"Working..."):(s.text||"");t.style.color=s.error?"var(--bad)":"";
+    $("#train").disabled=s.busy||!$("#file").files.length;
+    if(s.busy){clearTimeout(pollT);pollT=setTimeout(modelState,2500)}
+  }).catch(function(e){$("#minfo").textContent="The model state could not be read: "+e.message});
+}
+$("#file").onchange=function(){$("#train").disabled=!$("#file").files.length};
+$("#train").onclick=function(){
+  var f=$("#file").files[0];if(!f)return;if(f.size>20e6){$("#tprog").textContent="The file is too big (20 MB at most).";return}
+  var fr=new FileReader();fr.onload=function(){var b64=fr.result.split(",")[1]||"";$("#train").disabled=true;$("#tprog").textContent="Sending the file...";
+    post("/api/station/train",{name:f.name,b64:b64}).then(function(){modelState()}).catch(function(e){$("#tprog").textContent="Problem: "+e.message;$("#tprog").style.color="var(--bad)";$("#train").disabled=false})};
+  fr.readAsDataURL(f);
+};
+$("#reset").onclick=function(){post("/api/station/reset",{}).then(function(){modelState()}).catch(function(e){$("#tprog").textContent="Problem: "+e.message})};
+init();
+})();
+</script>
+</body></html>
